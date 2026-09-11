@@ -12,7 +12,10 @@ export class Header extends BasePage {
   readonly logo = this.root.locator(sel.logo).first();
   readonly menuButton = this.root.locator(sel.menuButton).first();
   // Desktop and mobile each render their own search icon.
-  readonly searchButton = this.visibleOf(sel.searchButton, sel.searchButtonMobile);
+  readonly searchButton = this.visibleOf(
+    sel.searchButton,
+    sel.searchButtonMobile,
+  );
   readonly cartButton = this.root.locator(sel.cartButton).first();
   readonly cartBadge = this.root.locator(sel.cartBadge).first();
   readonly accountLink = this.root.locator(sel.accountLink).first();
@@ -81,10 +84,8 @@ export class Header extends BasePage {
   }
 
   async openCart(): Promise<CartDrawer> {
-    await this.cartButton.click();
     const drawer = new CartDrawer(this.page);
-    await drawer.waitUntilOpen();
-    return drawer;
+    return drawer.openWith(() => this.cartButton.click());
   }
 
   /** Items in the cart per the header badge; `0` when no badge is rendered. */

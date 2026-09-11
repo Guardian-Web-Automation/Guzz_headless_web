@@ -102,6 +102,13 @@ export class SearchDrawer extends BasePage {
   async waitForResultsPage(): Promise<void> {
     await this.page.waitForURL(new RegExp(escapeRegExp(brand.paths.search)));
     await this.page.waitForLoadState('domcontentloaded');
+
+    // The URL and the document arrive before the results do: the heading is
+    // rendered once the search request comes back, so returning here left
+    // callers asserting against a page that had not filled in yet.
+    await expect(
+      this.page.locator(brand.selectors.searchPage.resultCount).first(),
+    ).toBeVisible({ timeout: 30_000 });
   }
 
   async close(): Promise<void> {

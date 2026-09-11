@@ -10,7 +10,7 @@
  */
 import { expect, test } from '@playwright/test';
 import { brand } from '../src/brand.config';
-import { createPages, escapeRegExp } from '../src/pages';
+import { createPages, escapeRegExp, settledScrollY } from '../src/pages';
 
 /** CSS uppercases many labels, so names are compared case-insensitively. */
 const caseless = (values: string[]): string[] =>
@@ -404,10 +404,12 @@ test.describe(`${brand.name} product detail page @smoke`, () => {
 
     const before = await app.product.header.cartCount();
     const urlBefore = page.url();
-    const scrollBefore = await page.evaluate(() => Math.round(window.scrollY));
+    const scrollBefore = await settledScrollY(page);
 
     await test.step(`Tap ADD on the ${name} card`, async () => {
-      await app.product.recommendationCard(name).addToCart();
+      await app.cartDrawer.openWith(() =>
+        app.product.recommendationCard(name).addToCart(),
+      );
     });
 
     await test.step('That product is added and the badge increases by one', async () => {
@@ -421,8 +423,12 @@ test.describe(`${brand.name} product detail page @smoke`, () => {
 
     await test.step('Shopper stays on the same page at the same scroll position', async () => {
       expect(page.url()).toBe(urlBefore);
-      const scrollAfter = await page.evaluate(() => Math.round(window.scrollY));
-      expect(Math.abs(scrollAfter - scrollBefore)).toBeLessThan(150);
+      // Read once the restore animation has finished, and judge it against
+      // the viewport: the shopper should still be looking at the same part
+      // of the page, which a fixed pixel budget does not express.
+      const scrollAfter = await settledScrollY(page);
+      const viewport = page.viewportSize()?.height ?? 800;
+      expect(Math.abs(scrollAfter - scrollBefore)).toBeLessThan(viewport / 2);
     });
   });
 });

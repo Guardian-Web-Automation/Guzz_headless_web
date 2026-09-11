@@ -29,6 +29,7 @@ export {
   discountPercent,
   escapeRegExp,
   loadStatus,
+  settledScrollY,
   parsePercent,
   parsePrice,
 } from './BasePage';

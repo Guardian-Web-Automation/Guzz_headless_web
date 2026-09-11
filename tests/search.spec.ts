@@ -151,7 +151,9 @@ test.describe(`${brand.name} search @smoke`, () => {
     const expected = search.product;
 
     await test.step(`Tap ADD on the ${expected.name} suggestion`, async () => {
-      await app.searchDrawer.cardAddButton(expected.name).click();
+      await app.cartDrawer.openWith(() =>
+        app.searchDrawer.cardAddButton(expected.name).click(),
+      );
     });
 
     await test.step('Add-to-cart confirmation shows the product', async () => {
@@ -262,7 +264,9 @@ test.describe(`${brand.name} search @smoke`, () => {
     const urlBefore = page.url();
 
     await test.step(`Tap ADD on the ${expected.name} card`, async () => {
-      await app.search.cardByName(expected.name).addToCart();
+      await app.cartDrawer.openWith(() =>
+        app.search.cardByName(expected.name).addToCart(),
+      );
     });
 
     await test.step('Product is added at the listed price', async () => {

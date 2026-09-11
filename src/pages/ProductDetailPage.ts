@@ -170,10 +170,8 @@ export class ProductDetailPage extends BasePage {
   /* ------------------------------------------------------------------ CTAs */
 
   async addToCart(): Promise<CartDrawer> {
-    await this.addToCartButton.click();
     const drawer = new CartDrawer(this.page);
-    await drawer.waitUntilOpen();
-    return drawer;
+    return drawer.openWith(() => this.addToCartButton.click());
   }
 
   /** Buy Now skips the cart and opens the checkout overlay directly. */
@@ -186,10 +184,8 @@ export class ProductDetailPage extends BasePage {
 
   async addBundle(): Promise<CartDrawer> {
     await this.bundleAddButton.scrollIntoViewIfNeeded();
-    await this.bundleAddButton.click();
     const drawer = new CartDrawer(this.page);
-    await drawer.waitUntilOpen();
-    return drawer;
+    return drawer.openWith(() => this.bundleAddButton.click());
   }
 
   async bundlePriceValue(): Promise<number> {

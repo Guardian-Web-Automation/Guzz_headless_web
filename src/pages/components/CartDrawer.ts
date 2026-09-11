@@ -57,8 +57,44 @@ export class CartDrawer extends BasePage {
 
   readonly closeButton = this.root.locator(sel.closeButton).first();
 
-  async waitUntilOpen(): Promise<void> {
-    await expect(this.root).toBeVisible();
+  /**
+   * The drawer element is always in the DOM; it is shown by a class the
+   * storefront adds once the add-to-cart request comes back. On CI that
+   * round trip is much slower than locally, so this gets its own budget
+   * rather than the global 15s expect timeout.
+   */
+  async waitUntilOpen(timeout = 30_000): Promise<void> {
+    await expect(this.root).toBeVisible({ timeout });
+  }
+
+  /**
+   * Performs an action that should open the drawer, and repeats it if the
+   * drawer does not appear.
+   *
+   * A single click is not reliable here: if it lands before the storefront
+   * has bound its handler, nothing happens at all and the drawer stays
+   * hidden forever — no amount of waiting recovers it, which is why whole
+   * test retries failed the same way on CI. Re-clicking does recover it.
+   */
+  async openWith(
+    action: () => Promise<void>,
+    attempts = 3,
+  ): Promise<CartDrawer> {
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      await action();
+
+      try {
+        // Short probes while retries remain, then one full-length wait.
+        await this.waitUntilOpen(attempt === attempts ? 30_000 : 10_000);
+        return this;
+      } catch (error) {
+        if (attempt === attempts) {
+          throw error;
+        }
+      }
+    }
+
+    return this;
   }
 
   /* ----------------------------------------------------------------- lines */

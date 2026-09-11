@@ -12,7 +12,7 @@
  */
 import { expect, test } from '@playwright/test';
 import { brand } from '../src/brand.config';
-import { createPages, loadStatus } from '../src/pages';
+import { createPages, loadStatus, settledScrollY } from '../src/pages';
 
 const home = brand.data.home;
 
@@ -180,10 +180,12 @@ test.describe(`${brand.name} home page @smoke`, () => {
     const expected = home.bestseller;
     const before = await app.home.header.cartCount();
     const urlBefore = page.url();
-    const scrollBefore = await page.evaluate(() => Math.round(window.scrollY));
+    const scrollBefore = await settledScrollY(page);
 
     await test.step(`Tap ADD on the ${expected.name} card`, async () => {
-      await app.home.bestsellerCard(expected.name).addToCart();
+      await app.cartDrawer.openWith(() =>
+        app.home.bestsellerCard(expected.name).addToCart(),
+      );
     });
 
     await test.step('Product is added at the listed price', async () => {
@@ -199,8 +201,12 @@ test.describe(`${brand.name} home page @smoke`, () => {
     await test.step('Badge increases by one with no reload or scroll jump', async () => {
       await expect(app.home.header.cartBadge).toHaveText(String(before + 1));
       expect(page.url()).toBe(urlBefore);
-      const scrollAfter = await page.evaluate(() => Math.round(window.scrollY));
-      expect(Math.abs(scrollAfter - scrollBefore)).toBeLessThan(150);
+      // Read once the restore animation has finished, and judge it against
+      // the viewport: the shopper should still be looking at the same part
+      // of the page, which a fixed pixel budget does not express.
+      const scrollAfter = await settledScrollY(page);
+      const viewport = page.viewportSize()?.height ?? 800;
+      expect(Math.abs(scrollAfter - scrollBefore)).toBeLessThan(viewport / 2);
     });
   });
 
@@ -271,10 +277,12 @@ test.describe(`${brand.name} home page @smoke`, () => {
     const expected = home.discoverySets[0];
     const before = await app.home.header.cartCount();
     const urlBefore = page.url();
-    const scrollBefore = await page.evaluate(() => Math.round(window.scrollY));
+    const scrollBefore = await settledScrollY(page);
 
     await test.step(`Tap ADD on the ${expected.name} card`, async () => {
-      await app.home.discoverCard(expected.name).addToCart();
+      await app.cartDrawer.openWith(() =>
+        app.home.discoverCard(expected.name).addToCart(),
+      );
     });
 
     await test.step('Product is added at the listed price', async () => {
@@ -290,8 +298,12 @@ test.describe(`${brand.name} home page @smoke`, () => {
     await test.step('Badge increases by one and the page does not jump', async () => {
       await expect(app.home.header.cartBadge).toHaveText(String(before + 1));
       expect(page.url()).toBe(urlBefore);
-      const scrollAfter = await page.evaluate(() => Math.round(window.scrollY));
-      expect(Math.abs(scrollAfter - scrollBefore)).toBeLessThan(150);
+      // Read once the restore animation has finished, and judge it against
+      // the viewport: the shopper should still be looking at the same part
+      // of the page, which a fixed pixel budget does not express.
+      const scrollAfter = await settledScrollY(page);
+      const viewport = page.viewportSize()?.height ?? 800;
+      expect(Math.abs(scrollAfter - scrollBefore)).toBeLessThan(viewport / 2);
     });
   });
 

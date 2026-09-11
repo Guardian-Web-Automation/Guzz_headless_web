@@ -41,6 +41,31 @@ export function discountPercent(comparePrice: number, price: number): number {
 }
 
 /**
+ * Current scroll offset, read only once it has stopped moving.
+ *
+ * Opening the cart drawer locks body scroll and closing it restores the
+ * position; on mobile WebKit that restore is animated, so an immediate read
+ * catches the page mid-flight and reports a position the shopper never
+ * actually saw. Two equal reads in a row mean the page has settled.
+ */
+export async function settledScrollY(page: Page): Promise<number> {
+  let previous = -1;
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const current = await page.evaluate(() => Math.round(window.scrollY));
+
+    if (current === previous) {
+      return current;
+    }
+
+    previous = current;
+    await page.waitForTimeout(150);
+  }
+
+  return previous;
+}
+
+/**
  * Loads a URL and returns its HTTP status.
  *
  * Uses a real navigation rather than a bare API request: that is what the

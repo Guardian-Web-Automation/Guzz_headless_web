@@ -996,7 +996,9 @@ const guzz: BrandConfig = {
 
 const brands: Record<string, BrandConfig> = { guzz };
 
-const key = (process.env.BRAND ?? 'guzz').toLowerCase();
+// `||` not `??`: an unset `${{ vars.BRAND }}` in CI expands to an empty
+// string, and `??` would let that win and fail brand lookup.
+const key = (process.env.BRAND || 'guzz').toLowerCase();
 const selected = brands[key];
 
 if (!selected) {

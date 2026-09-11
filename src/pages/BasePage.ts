@@ -1,0 +1,94 @@
+/**
+ * Shared base for every page object and component.
+ *
+ * Brand-agnostic: holds no selector, path or label of its own.
+ */
+import { expect, Locator, Page } from '@playwright/test';
+
+/** Escapes a plain string so it can be used inside a RegExp. */
+export function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** `"₹1,399"` -> `1399`. Handles ₹, Rs., commas and stray whitespace. */
+export function parsePrice(text: string): number {
+  const value = Number(text.replace(/Rs\.?/gi, '').replace(/[^0-9.]/g, ''));
+
+  if (!Number.isFinite(value) || text.trim() === '') {
+    throw new Error(`Unable to parse price: "${text}"`);
+  }
+
+  return value;
+}
+
+/** `"-25% OFF"` -> `25`. */
+export function parsePercent(text: string): number {
+  const match = text.match(/(\d+(?:\.\d+)?)\s*%/);
+
+  if (!match) {
+    throw new Error(`Unable to parse percentage: "${text}"`);
+  }
+
+  return Number(match[1]);
+}
+
+export function discountPercent(comparePrice: number, price: number): number {
+  if (comparePrice <= 0) {
+    throw new Error('Compare-at price must be greater than zero');
+  }
+
+  return ((comparePrice - price) / comparePrice) * 100;
+}
+
+/**
+ * Loads a URL and returns its HTTP status.
+ *
+ * Uses a real navigation rather than a bare API request: that is what the
+ * test cases describe, and the storefront intermittently resets plain
+ * requests under load. Transient connection errors are retried.
+ */
+export async function loadStatus(page: Page, url: string): Promise<number> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await page.goto(url, { waitUntil: 'domcontentloaded' });
+
+      if (response) {
+        return response.status();
+      }
+
+      throw new Error(`No response received for ${url}`);
+    } catch (error) {
+      lastError = error;
+      await page.waitForTimeout(1_000);
+    }
+  }
+
+  throw lastError;
+}
+
+export class BasePage {
+  constructor(protected readonly page: Page) {}
+
+  async goto(path: string): Promise<void> {
+    await this.page.goto(path);
+    await this.page.waitForLoadState('domcontentloaded');
+  }
+
+  async text(locator: Locator): Promise<string> {
+    return (await locator.innerText()).trim();
+  }
+
+  async priceOf(locator: Locator): Promise<number> {
+    return parsePrice(await this.text(locator));
+  }
+
+  async expectUrlContains(fragment: string | RegExp): Promise<void> {
+    await expect(this.page).toHaveURL(
+      typeof fragment === 'string'
+        ? new RegExp(escapeRegExp(fragment))
+        : fragment,
+    );
+  }
+}

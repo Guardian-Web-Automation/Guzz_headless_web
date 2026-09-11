@@ -1,0 +1,35 @@
+{
+  "name": "guzz-automation",
+  "version": "1.0.0",
+  "description": "Brand-agnostic Playwright suite. Select the brand with BRAND=<key>; see src/brand.config.ts.",
+  "private": true,
+  "scripts": {
+    "test": "cross-env NODE_OPTIONS=--enable-source-maps playwright test",
+    "test:headed": "cross-env NODE_OPTIONS=--enable-source-maps playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:smoke": "playwright test --grep @smoke",
+    "test:sanity": "playwright test --grep @sanity",
+    "test:regression": "playwright test --grep @regression",
+    "test:e2e": "playwright test --grep @e2e",
+    "test:debug": "cross-env PWDEBUG=1 playwright test",
+    "report": "playwright show-report",
+    "codegen": "playwright codegen",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.5.0",
+    "cross-env": "^10.1.0",
+    "eslint": "^10.10.0",
+    "prettier": "^3.9.6",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2"
+  }
+}

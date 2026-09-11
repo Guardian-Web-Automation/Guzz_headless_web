@@ -18,7 +18,7 @@ concurrency:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     # Job-level env so the Slack step's `if:` can read the secret
     # (a step's own step-level env is NOT visible to that step's `if`).
     env:
@@ -37,8 +37,10 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
-        # The suite runs on desktop Chrome only.
-        run: npx playwright install --with-deps chromium
+        # Chromium covers desktop-chrome and mobile-chrome (Pixel 7);
+        # mobile-safari (iPhone 14) needs WebKit. Installing only chromium
+        # fails every mobile-safari test with a missing-executable error.
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Run smoke suite
         run: npm run smoke

@@ -71,6 +71,20 @@ export async function loadStatus(page: Page, url: string): Promise<number> {
 export class BasePage {
   constructor(protected readonly page: Page) {}
 
+  /**
+   * The storefront renders a different control for the same job at each
+   * breakpoint — a header nav or a hamburger, a sort dropdown or a sort
+   * drawer, an inline CTA or a sticky bar. Both are in the DOM; only one is
+   * visible. This picks whichever the current viewport is showing, so one
+   * page object drives desktop and mobile alike.
+   */
+  protected visibleOf(...selectors: string[]): Locator {
+    return this.page
+      .locator(selectors.join(', '))
+      .filter({ visible: true })
+      .first();
+  }
+
   async goto(path: string): Promise<void> {
     await this.page.goto(path);
     await this.page.waitForLoadState('domcontentloaded');

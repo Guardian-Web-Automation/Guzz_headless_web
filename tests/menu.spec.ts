@@ -3,12 +3,11 @@
  * 5 test cases, renumbered GZ_MENU_01..05.
  * Sheet serial numbers, in the same order: GZ_MENU_POS_017..021.
  *
- * ADAPTED FOR DESKTOP. The sheet drives a mobile hamburger drawer: "tap the
- * hamburger icon, then tap the link, the drawer closes". On desktop there is
- * no drawer — the hamburger is display:none and the category links sit in
- * the always-visible header nav. Each case taps the header link directly,
- * and asserts the hamburger is absent from this layout in place of the
- * "drawer closes" expectation.
+ * Runs on every project. The sheet drives a mobile hamburger drawer: "tap
+ * the hamburger icon, then tap the link, the drawer closes" — which is what
+ * happens on the mobile projects. On desktop there is no drawer: the
+ * hamburger is display:none and the links sit in the always-visible header
+ * nav, so that expectation is checked against the desktop equivalent.
  *
  *   npx playwright test tests/menu.spec.ts --headed --workers=1
  */
@@ -50,17 +49,32 @@ test.describe(`${brand.name} navigation menu @smoke`, () => {
 
       await app.home.open();
 
-      await test.step('Category links are in the header, not a drawer', async () => {
-        // ADAPTED: the mobile hamburger is not rendered at this width.
-        await expect(app.home.header.nav).toBeVisible();
-        await expect(app.home.header.menuButton).toBeHidden();
-        await expect(app.home.header.navLink(entry.label)).toBeVisible();
+      const onMobile = await app.home.header.isMobileLayout();
+
+      await test.step('The category link is reachable for this viewport', async () => {
+        if (onMobile) {
+          // The sheet's flow: tap the hamburger, then the link.
+          await expect(app.home.header.menuButton).toBeVisible();
+          await app.home.header.openMenu();
+          await expect(app.home.header.drawerLink(entry.label)).toBeVisible();
+        } else {
+          // ADAPTED: no drawer at this width; the links sit in the header.
+          await expect(app.home.header.nav).toBeVisible();
+          await expect(app.home.header.menuButton).toBeHidden();
+          await expect(app.home.header.navLink(entry.label)).toBeVisible();
+        }
       });
 
       await test.step(`Tap ${entry.label}`, async () => {
         await app.home.header.navigateTo(entry.label);
         await page.waitForURL(new RegExp(entry.path));
       });
+
+      if (onMobile) {
+        await test.step('The drawer closes on navigation', async () => {
+          expect(await app.home.header.isMenuOpen()).toBe(false);
+        });
+      }
 
       await test.step('The collection loads with its heading and products', async () => {
         await expect(page).toHaveURL(new RegExp(entry.path));

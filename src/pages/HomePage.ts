@@ -89,36 +89,53 @@ export class HomePage extends ProductListPage {
   }
 
   /**
-   * Document-absolute position of each named section, so a spec can assert
-   * they render top to bottom. Absolute rather than viewport-relative
-   * because the header is sticky and would always report zero.
+   * Document order of each named section, so a spec can assert they render
+   * top to bottom.
+   *
+   * Deliberately not a pixel measurement. The header is sticky and the site
+   * swaps it to `position: fixed` once the page scrolls, so every
+   * geometric read of it — `getBoundingClientRect().top + scrollY`,
+   * `offsetTop`, or either taken after a scroll-to-top that WebKit had not
+   * finished settling — reports where it is pinned rather than where it
+   * belongs, and the section order came out wrong on mobile Safari.
+   * Document order is what "renders in order" means and no amount of
+   * positioning changes it.
    */
   async sectionPositions(names: string[]): Promise<number[]> {
-    // Measure from the top of the document: the header is sticky, so while
-    // the page is scrolled it reports wherever it is pinned, not where it
-    // sits in the layout.
-    await this.page.evaluate(() => window.scrollTo(0, 0));
-    await expect
-      .poll(async () => this.page.evaluate(() => Math.round(window.scrollY)))
-      .toBe(0);
+    const selectors = names.map((name) => {
+      const selector = SECTION_SELECTORS[name];
 
-    const positions: number[] = [];
-
-    for (const name of names) {
-      const locator = this.section(name);
-
-      if ((await locator.count()) === 0) {
-        throw new Error(`Home section "${name}" is not rendered`);
+      if (!selector) {
+        throw new Error(`Unknown home section "${name}"`);
       }
 
-      positions.push(
-        await locator.evaluate((element) =>
-          Math.round(element.getBoundingClientRect().top + window.scrollY),
-        ),
-      );
-    }
+      return selector;
+    });
 
-    return positions;
+    return this.page.evaluate((list: string[]) => {
+      const elements = list.map((selector) => {
+        const element = document.querySelector(selector);
+
+        if (!element) {
+          throw new Error(`Home section "${selector}" is not rendered`);
+        }
+
+        return element;
+      });
+
+      // Rank by document order: DOCUMENT_POSITION_FOLLOWING (4) means `b`
+      // comes after `a` in the document.
+      return elements.map(
+        (element) =>
+          elements.filter(
+            (other) =>
+              other !== element &&
+              (element.compareDocumentPosition(other) &
+                Node.DOCUMENT_POSITION_PRECEDING) !==
+                0,
+          ).length,
+      );
+    }, selectors);
   }
 
   /* ------------------------------------------------------------------ hero */
@@ -182,9 +199,13 @@ export class HomePage extends ProductListPage {
 
   /* -------------------------------------------------------------- notes */
 
-  /** The note currently on screen. This section rotates on its own too. */
+  /**
+   * The note currently on screen. This section rotates on its own, and
+   * desktop and mobile render it through different wrappers with the same
+   * inner markup.
+   */
   activeNoteItem(): Locator {
-    return this.notes.locator(`.${sel.notesActiveItemClass}`).first();
+    return this.visibleOf(sel.notesActiveItem, sel.notesActiveItemMobile);
   }
 
   async activeNoteName(): Promise<string> {

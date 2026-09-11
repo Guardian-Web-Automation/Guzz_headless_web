@@ -23,12 +23,18 @@ export class CollectionPage extends ProductListPage {
   readonly toolbar = this.page.locator(page$.toolbar);
   readonly grid = this.page.locator(page$.grid);
 
-  // Sort
-  readonly sortButton = this.page.locator(sel.sortButton).first();
-  readonly sortMenuItems = this.page.locator(sel.sortDropdownItem);
+  // Sort. Desktop shows a toolbar dropdown; mobile a sticky-bar cell that
+  // opens a drawer. Both exist in the DOM, so take whichever is visible.
+  readonly sortButton = this.visibleOf(sel.sortButton, sel.mobileSortCell);
+  readonly sortMenuItems = this.page
+    .locator(`${sel.sortDropdownItem}, ${sel.sortOption}`)
+    .filter({ visible: true });
 
   // Filter
-  readonly filterButton = this.page.locator(sel.filterButton).first();
+  readonly filterButton = this.visibleOf(
+    sel.filterButton,
+    sel.mobileFilterCell,
+  );
   readonly filterDrawer = this.page.locator(sel.filterDrawer);
   readonly filterDrawerTitle = this.filterDrawer
     .locator(sel.filterDrawerTitle)
@@ -70,10 +76,15 @@ export class CollectionPage extends ProductListPage {
     let current = await this.productCount();
 
     while (Date.now() < deadline) {
+      // The fallback is a scripted scroll, not `mouse.wheel`: mobile WebKit
+      // has no wheel input at all and throws outright, which took the whole
+      // collection suite down on iPhone.
       await this.page
         .locator(page$.sentinel)
         .scrollIntoViewIfNeeded()
-        .catch(() => this.page.mouse.wheel(0, 8000));
+        .catch(() =>
+          this.page.evaluate(() => window.scrollBy(0, window.innerHeight * 8)),
+        );
       await this.page.waitForTimeout(800);
       current = await this.productCount();
 
@@ -146,8 +157,18 @@ export class CollectionPage extends ProductListPage {
 
   /* ------------------------------------------------------------------ sort */
 
-  /** Reads the sort control's current value, e.g. "Best Selling". */
+  /**
+   * The sort control's current value, e.g. "Best Selling". Desktop renders
+   * it as "Sort By: <value>" on the button; mobile splits it across a label
+   * and a sub-line in the sticky bar.
+   */
   async currentSort(): Promise<string> {
+    const sub = this.sortButton.locator(sel.mobileCellSub);
+
+    if ((await sub.count()) > 0) {
+      return this.text(sub.first());
+    }
+
     return (await this.text(this.sortButton)).replace(/^Sort By:?\s*/i, '');
   }
 
@@ -169,11 +190,23 @@ export class CollectionPage extends ProductListPage {
 
   readonly selectedSortOptionItem = this.page
     .locator(sel.sortOptionSelected)
+    .filter({ visible: true })
     .first();
 
-  /** The option marked as currently selected in the sort menu. */
+  /**
+   * The option marked selected in the sort menu. Desktop flags it with a
+   * class on the item; mobile with a checked radio inside the option.
+   */
   async selectedSortOption(): Promise<string> {
-    return this.text(this.selectedSortOptionItem);
+    if ((await this.selectedSortOptionItem.count()) > 0) {
+      return this.text(this.selectedSortOptionItem);
+    }
+
+    const checked = this.sortMenuItems
+      .filter({ has: this.page.locator(`${sel.sortOptionRadio}.checked`) })
+      .first();
+
+    return this.text(checked);
   }
 
   async sortBy(label: string): Promise<void> {
@@ -277,7 +310,7 @@ export class CollectionPage extends ProductListPage {
 
     await this.clearAllButton.click();
     await expect(this.filterDrawer).not.toHaveClass(new RegExp(sel.openClass));
-    await expect(this.filterButton).not.toContainText('(');
+    await expect.poll(async () => this.appliedFilterCount()).toBe(0);
     await this.waitForGridUpdate(before);
   }
 
@@ -286,6 +319,7 @@ export class CollectionPage extends ProductListPage {
    * Desktop renders `Filter (1)`; mobile renders `1 Applied`.
    */
   async appliedFilterCount(): Promise<number> {
+    // Desktop: "Filter (1)". Mobile: a "Filter" label above "1 Applied".
     const match = (await this.text(this.filterButton)).match(/(\d+)/);
     return match ? Number(match[1]) : 0;
   }

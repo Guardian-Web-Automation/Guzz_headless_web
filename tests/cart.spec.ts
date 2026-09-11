@@ -337,7 +337,7 @@ test.describe(`${brand.name} cart @smoke`, () => {
     });
   });
 
-  test('GZ_CART_11 - CHECKOUT hands over to GoKwik with a matching order value', async ({
+  test('GZ_CART_11 - CHECKOUT hands over to checkout with a matching order value', async ({
     page,
   }) => {
     const app = createPages(page);
@@ -349,9 +349,18 @@ test.describe(`${brand.name} cart @smoke`, () => {
     const checkout = await test.step('Tap CHECKOUT', async () =>
       drawer.proceedToCheckout());
 
+    // GoKwik in Chromium, Shopify's hosted checkout in WebKit — the
+    // storefront picks, so assert only what both actually show.
+    const flavour = await checkout.flavour();
+
     await test.step('Checkout loads with an order summary', async () => {
-      await expect(checkout.frameElement).toBeVisible();
-      await expect(checkout.orderSummary).toContainText(/order summary/i);
+      if (flavour === 'gokwik') {
+        await expect(checkout.frameElement).toBeVisible();
+        await expect(checkout.orderSummary).toContainText(/order summary/i);
+        return;
+      }
+
+      await checkout.waitUntilOpen();
     });
 
     await test.step('Order summary reconciles with the cart', async () => {

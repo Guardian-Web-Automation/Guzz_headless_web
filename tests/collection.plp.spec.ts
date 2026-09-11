@@ -4,8 +4,9 @@
  * Sheet serial numbers, in the same order: GZ_PLP_POS_001, 008, 015, 019,
  * 028, 031, 032, 042, 048, 055, 065, 071.
  *
- * Runs on desktop Chrome. Two cases describe mobile-only UI and are adapted
- * to their desktop equivalents — see the notes on GZ_PLP_01 and GZ_PLP_05.
+ * Runs on every project. Two cases describe mobile-only UI, which the
+ * mobile projects exercise as written; on desktop they are checked against
+ * the desktop equivalents — see the notes on GZ_PLP_01 and GZ_PLP_05.
  *
  *   npx playwright test tests/collection.plp.spec.ts --headed --workers=1
  */
@@ -166,12 +167,16 @@ test.describe(`${brand.name} collection page @smoke`, () => {
     });
 
     await test.step('All six options are listed in order', async () => {
-      expect(await app.collection.sortOptionLabels()).toEqual(data.sortOptions);
+      // The mobile sort drawer uppercases its labels via CSS.
+      const labels = await app.collection.sortOptionLabels();
+      expect(labels.map((label) => label.toLowerCase())).toEqual(
+        data.sortOptions.map((label) => label.toLowerCase()),
+      );
     });
 
     await test.step(`${shopAll.defaultSort} is pre-selected`, async () => {
-      expect(await app.collection.selectedSortOption()).toBe(
-        shopAll.defaultSort,
+      expect((await app.collection.selectedSortOption()).toLowerCase()).toBe(
+        shopAll.defaultSort.toLowerCase(),
       );
       // The control's label and the menu's selected item must agree.
       await expect(app.collection.sortButton).toContainText(

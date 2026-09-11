@@ -47,10 +47,12 @@ export default defineConfig({
     navigationTimeout: 45_000,
   },
   expect: { timeout: 15_000 },
+  // The same specs run on all three: the page objects pick whichever
+  // control the viewport is showing (header nav vs hamburger drawer, sort
+  // dropdown vs sort drawer, inline CTAs vs sticky bar).
   projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
+    { name: 'desktop-chrome', use: { ...devices['Desktop Chrome'] } },
+    { name: 'mobile-chrome', use: { ...devices['Pixel 7'] } },
+    { name: 'mobile-safari', use: { ...devices['iPhone 14'] } },
   ],
 });

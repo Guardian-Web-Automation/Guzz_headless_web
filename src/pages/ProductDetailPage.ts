@@ -24,6 +24,8 @@ export class ProductDetailPage extends BasePage {
   readonly galleryDot = this.page.locator(sel.galleryDot);
   readonly galleryPrevButton = this.page.locator(sel.galleryPrev);
   readonly galleryNextButton = this.page.locator(sel.galleryNext);
+  /** Desktop navigates the gallery with arrows, mobile with dot indicators. */
+  readonly galleryNavigation = this.visibleOf(sel.galleryNext, sel.galleryDots);
   readonly title = this.page.locator(sel.title).first();
   readonly wishlistButton = this.page.locator(sel.wishlistButton).first();
   readonly shareButton = this.page.locator(sel.shareButton).first();
@@ -46,8 +48,9 @@ export class ProductDetailPage extends BasePage {
   readonly decreaseQuantityButton = this.page
     .locator(sel.decreaseQuantity)
     .first();
-  readonly addToCartButton = this.page.locator(sel.addToCart).first();
-  readonly buyNowButton = this.page.locator(sel.buyNow).first();
+  // Desktop puts the CTAs in the info block, mobile in the sticky bar.
+  readonly addToCartButton = this.visibleOf(sel.addToCart, sel.stickyAddToCart);
+  readonly buyNowButton = this.visibleOf(sel.buyNow, sel.stickyBuyNow);
   readonly stickyBar = this.page.locator(sel.stickyBar);
 
   // Sections

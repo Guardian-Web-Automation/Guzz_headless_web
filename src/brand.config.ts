@@ -184,6 +184,12 @@ export type Selectors = {
     logo: string;
     menuButton: string;
     searchButton: string;
+    /** The header swaps controls at the mobile breakpoint. */
+    searchButtonMobile: string;
+    menuDrawer: string;
+    menuDrawerOpenClass: string;
+    menuDrawerClose: string;
+    menuDrawerLink: string;
     cartButton: string;
     cartBadge: string;
     accountLink: string;
@@ -262,7 +268,9 @@ export type Selectors = {
     notes: string;
     notesTitle: string;
     notesItem: string;
-    notesActiveItemClass: string;
+    /** The active note. Desktop and mobile use different wrappers. */
+    notesActiveItem: string;
+    notesActiveItemMobile: string;
     notesItemName: string;
     notesItemLink: string;
     perfumers: string;
@@ -283,6 +291,11 @@ export type Selectors = {
   listing: {
     filterButton: string;
     sortButton: string;
+    /** Mobile renders sort/filter as a sticky bottom bar instead. */
+    mobileBar: string;
+    mobileSortCell: string;
+    mobileFilterCell: string;
+    mobileCellSub: string;
     /** Desktop sort menu items. */
     sortDropdownItem: string;
     /** Mobile sort drawer, kept so the same config drives a mobile run. */
@@ -330,8 +343,10 @@ export type Selectors = {
     decreaseQuantity: string;
     addToCart: string;
     buyNow: string;
-    /** Mobile-only action bar. */
+    /** Mobile-only action bar, carrying its own copy of the CTAs. */
     stickyBar: string;
+    stickyAddToCart: string;
+    stickyBuyNow: string;
     uspRow: string;
     uspItem: string;
     keyNotes: string;
@@ -398,13 +413,36 @@ export type Selectors = {
     total: string;
     totalAmount: string;
   };
-  /** GoKwik checkout, rendered in a cross-origin iframe. */
+  /**
+   * Checkout. The storefront has two front-ends and which one appears is
+   * decided by the browser, not by the test: GoKwik renders in a
+   * cross-origin iframe over the storefront, but in WebKit it does not
+   * engage at all and BUY NOW / CHECKOUT land on Shopify's own hosted
+   * checkout instead.
+   */
   checkout: {
     iframe: string;
     orderSummary: string;
     summaryPricing: string;
     originalPrice: string;
     loginContainer: string;
+    /** Expands the collapsed summary to reveal the ordered lines. */
+    summaryToggle: string;
+    lineName: string;
+    /**
+     * Shopify's hosted checkout. Its class names are hashed per build, so
+     * these are the ARIA roles, which are stable: the first table lists the
+     * line items, the second the totals.
+     */
+    native: {
+      url: RegExp;
+      table: string;
+      row: string;
+      rowHeader: string;
+      totalRowHeader: string;
+      /** Collapses the summary on narrow viewports. */
+      summaryToggle: string;
+    };
   };
   cartDrawer: {
     root: string;
@@ -585,12 +623,18 @@ const guzz: BrandConfig = {
         { label: 'Men', path: '/collections/mens-perfume-collection' },
         { label: 'Women', path: '/collections/womens-perfume-collection' },
         { label: 'My Wishlist', path: '/wishlist' },
-        { label: 'Track My Order', path: 'https://guzz.shiprocket.co/tracking' },
+        {
+          label: 'Track My Order',
+          path: 'https://guzz.shiprocket.co/tracking',
+        },
       ],
       policyLinks: [
         { label: 'Terms of Service', path: '/policies/terms-of-service' },
         { label: 'Privacy Policy', path: '/policies/privacy-policy' },
-        { label: 'Shipping & Return Policy', path: '/policies/shipping-return-policy' },
+        {
+          label: 'Shipping & Return Policy',
+          path: '/policies/shipping-return-policy',
+        },
         { label: 'Contact Us', path: '/contact-us' },
         { label: 'About Us', path: '/about-us' },
       ],
@@ -699,6 +743,11 @@ const guzz: BrandConfig = {
       logo: '.header-logo',
       menuButton: '.mobile-menu-btn',
       searchButton: '.header-search-desktop',
+      searchButtonMobile: '.header-search-mobile',
+      menuDrawer: '.mobile-menu-overlay',
+      menuDrawerOpenClass: 'open',
+      menuDrawerClose: '.mobile-menu-close',
+      menuDrawerLink: '.mobile-menu-link',
       // .header-right also holds a mobile search button that is hidden on
       // desktop, so the cart icon is pinned by its label.
       cartButton: '[aria-label="Open cart"]',
@@ -780,7 +829,8 @@ const guzz: BrandConfig = {
       notes: '.notes-section',
       notesTitle: '.section-title',
       notesItem: '.notes-overlay-item',
-      notesActiveItemClass: 'notes-overlay-item--active',
+      notesActiveItem: '.notes-overlay-item--active',
+      notesActiveItemMobile: '.notes-slide--active',
       notesItemName: '.notes-text h3',
       // The image links to the product; the "discover more" button below it
       // goes to a collection instead.
@@ -802,6 +852,10 @@ const guzz: BrandConfig = {
     listing: {
       filterButton: '.collection-filter-btn',
       sortButton: '.collection-sort-btn',
+      mobileBar: '.mobile-filter-sort-bar',
+      mobileSortCell: '.mfs-cell:has-text("Sort")',
+      mobileFilterCell: '.mfs-cell:has-text("Filter")',
+      mobileCellSub: '.mfs-sub',
       sortDropdownItem: '.collection-sort-dropdown-item',
       sortDrawer: '.plp-sort-drawer',
       sortOption: '.plp-sort-option',
@@ -847,6 +901,8 @@ const guzz: BrandConfig = {
       addToCart: '.pdp-info-buttons .pdp-btn-atc',
       buyNow: '.pdp-info-buttons .pdp-btn-buy',
       stickyBar: '.pdp-sticky-bar',
+      stickyAddToCart: '.pdp-sticky-bar .pdp-btn-atc',
+      stickyBuyNow: '.pdp-sticky-bar .pdp-btn-buy',
       uspRow: '.pdp-trust-row',
       uspItem: '.pdp-trust-item',
       keyNotes: '.pdp-keynotes',
@@ -912,6 +968,16 @@ const guzz: BrandConfig = {
       summaryPricing: '.exp-summary-pricing',
       originalPrice: '.exp-original-price',
       loginContainer: '.login-container',
+      summaryToggle: '.exp-summary-content',
+      lineName: '.product-details-top',
+      native: {
+        url: /\/checkouts\//,
+        table: '[role="table"]',
+        row: '[role="row"]',
+        rowHeader: '[role="rowheader"]',
+        totalRowHeader: 'Total',
+        summaryToggle: '[aria-controls="mobileOrderSummary"]',
+      },
     },
     cartDrawer: {
       root: '.cart-drawer',

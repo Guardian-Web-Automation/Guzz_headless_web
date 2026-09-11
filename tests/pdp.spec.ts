@@ -34,10 +34,10 @@ test.describe(`${brand.name} product detail page @smoke`, () => {
 
     await test.step('Gallery is shown', async () => {
       await expect(app.product.gallery).toBeVisible();
-      // ADAPTED: dot indicators are the mobile gallery control; desktop
-      // shows prev/next arrows instead.
+      // Dot indicators are the mobile gallery control; desktop shows
+      // prev/next arrows instead. Either is a valid way to page it.
       await expect(app.product.galleryDots).toBeAttached();
-      await expect(app.product.galleryNextButton).toBeVisible();
+      await expect(app.product.galleryNavigation).toBeVisible();
     });
 
     await test.step('Title block shows title, wishlist, share, subtitle and rating', async () => {
@@ -159,21 +159,39 @@ test.describe(`${brand.name} product detail page @smoke`, () => {
     const checkout = await test.step('Tap BUY NOW', async () =>
       app.product.buyNow());
 
+    // Which checkout opens is the browser's choice, not the test's: GoKwik
+    // overlays the storefront in Chromium, while WebKit gets Shopify's own
+    // hosted checkout because GoKwik never engages there.
+    const flavour = await checkout.flavour();
+
     await test.step('Checkout opens with an order summary', async () => {
-      await expect(checkout.frameElement).toBeVisible();
-      await expect(checkout.orderSummary).toContainText(/order summary/i);
+      if (flavour === 'gokwik') {
+        await expect(checkout.frameElement).toBeVisible();
+        await expect(checkout.orderSummary).toContainText(/order summary/i);
+      }
+
+      await expect(async () =>
+        expect(await checkout.lineItemsText()).toMatch(
+          new RegExp(escapeRegExp(pdp.name), 'i'),
+        ),
+      ).toPass();
     });
 
     await test.step('Order summary reconciles with one item at the product price', async () => {
       expect(await checkout.itemCount()).toBe(1);
       expect(await checkout.payableAmount()).toBe(pdp.price);
-      await expect(checkout.originalPrice).toContainText(
-        String(pdp.comparePrice.toLocaleString('en-IN')),
-      );
+
+      // Only GoKwik shows the struck-through original; Shopify's checkout
+      // carries no compare-at price to assert against.
+      if (flavour === 'gokwik') {
+        await expect(checkout.originalPrice).toContainText(
+          String(pdp.comparePrice.toLocaleString('en-IN')),
+        );
+      }
     });
 
     await test.step('The cart page was skipped', async () => {
-      expect(page.url()).toContain(`/products/${pdp.handle}`);
+      expect(page.url()).not.toContain('/cart');
     });
   });
 

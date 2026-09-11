@@ -16,7 +16,8 @@
     "codegen": "playwright codegen",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "smoke": "playwright test --grep @smoke"
   },
   "keywords": [],
   "author": "",

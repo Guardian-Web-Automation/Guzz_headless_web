@@ -1,0 +1,73 @@
+name: GUZZ Automation Suite
+
+on:
+  # Daily at 03:30 UTC = 09:00 AM IST (staggered an hour after Bevzilla).
+  schedule:
+    - cron: '30 3 * * *'
+  # Manual trigger from the Actions tab
+  workflow_dispatch:
+  # Also run on pushes to main
+  push:
+    branches: [main]
+
+# Never let two runs hit the live storefront at once.
+concurrency:
+  group: guzz-automation-suite
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Job-level env so the Slack step's `if:` can read the secret
+    # (a step's own step-level env is NOT visible to that step's `if`).
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        # The suite runs on desktop Chrome only.
+        run: npx playwright install --with-deps chromium
+
+      - name: Run smoke suite
+        run: npm run smoke
+        env:
+          # Optional: set repo variable BASE_URL to target a different environment.
+          BASE_URL: ${{ vars.BASE_URL }}
+          # Optional: set repo variable BRAND to run another brand from src/brand.config.ts.
+          BRAND: ${{ vars.BRAND }}
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_number }}
+          path: playwright-report
+          retention-days: 30
+
+      - name: Upload JUnit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-results-${{ github.run_number }}
+          path: results/junit.xml
+          retention-days: 30
+
+      - name: Send Slack notification
+        if: always() && env.SLACK_WEBHOOK_URL != ''
+        env:
+          JOB_STATUS: ${{ job.status }}
+          EVENT: ${{ github.event_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node .github/scripts/slack-report.mjs

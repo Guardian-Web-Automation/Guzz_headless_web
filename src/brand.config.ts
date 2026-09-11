@@ -1005,10 +1005,17 @@ if (!selected) {
   );
 }
 
-/** The active brand. BASE_URL in .env overrides the brand's own URL (staging, preview, etc.). */
+/**
+ * The active brand. BASE_URL overrides the brand's own URL (staging,
+ * preview, etc.).
+ *
+ * `||` rather than `??`: an unset `${{ vars.BASE_URL }}` in CI expands to an
+ * empty string, and with `??` that empty string would win and leave baseURL
+ * blank, making every relative goto() an invalid URL.
+ */
 export const brand: BrandConfig = {
   ...selected,
-  baseUrl: process.env.BASE_URL ?? selected.baseUrl,
+  baseUrl: process.env.BASE_URL || selected.baseUrl,
 };
 
 export const availableBrands = Object.keys(brands);

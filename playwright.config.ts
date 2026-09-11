@@ -22,10 +22,17 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 1,
   workers: process.env.CI ? 4 : undefined,
   reporter: [
-    ['html', { open: 'never', outputFolder: 'playwright-report' }],
-    // Machine-readable totals for the Slack report.
-    ['json', { outputFile: 'playwright-report/results.json' }],
     ['line'],
+    ['html', { open: 'never', outputFolder: 'playwright-report' }],
+    // In CI: failure annotations in the Actions UI, JUnit for the artifact,
+    // and JSON for the Slack summary.
+    ...(process.env.CI
+      ? ([
+          ['github'],
+          ['junit', { outputFile: 'results/junit.xml' }],
+          ['json', { outputFile: 'results/results.json' }],
+        ] as const)
+      : []),
   ],
   // The product grid loads in batches as it scrolls and several pages wait
   // on third-party widgets, so Playwright's 30s default budget is too tight

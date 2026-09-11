@@ -1,16 +1,23 @@
 /**
- * Posts a Playwright run summary to Slack.
+ * Posts a Playwright run summary to Slack, in the same format the other
+ * Guardian automation repos use.
  *
- * Reads the JSON reporter output, builds a Block Kit message and sends it to
- * the incoming webhook in SLACK_WEBHOOK_URL. Never fails the job: a broken
- * notification should not mask a green (or red) test run.
+ * Counts come from the JSON reporter rather than parsing the JUnit XML:
+ * the JSON report also distinguishes flaky runs, and it needs no regex over
+ * markup. Falls back to the job status when no results file exists (an
+ * earlier step failed before the suite ran).
+ *
+ * Never fails the job — a broken notification must not mask the result.
  */
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 
-const RESULTS = process.env.RESULTS_FILE ?? 'playwright-report/results.json';
+const RESULTS = process.env.RESULTS_FILE ?? 'results/results.json';
 const webhook = process.env.SLACK_WEBHOOK_URL;
-const brand = process.env.BRAND_NAME ?? 'Automation';
-const trigger = process.env.TRIGGERED_BY ?? 'manual';
+const brand = process.env.BRAND_NAME ?? 'GUZZ';
+const suiteName = process.env.SUITE_NAME ?? `${brand} Automation Report`;
+const footer = process.env.SUITE_FOOTER ?? `${brand} Headless | Playwright + TypeScript`;
+const event = process.env.EVENT ?? 'manual';
+const jobStatus = process.env.JOB_STATUS ?? 'unknown';
 const runUrl = process.env.RUN_URL;
 
 async function readStats() {
@@ -23,111 +30,83 @@ async function readStats() {
       failed: s.unexpected ?? 0,
       flaky: s.flaky ?? 0,
       skipped: s.skipped ?? 0,
-      durationMs: s.duration ?? 0,
-      ok: (s.unexpected ?? 0) === 0,
+      hasResults: true,
     };
-  } catch (error) {
-    console.error(`Could not read ${RESULTS}: ${error.message}`);
-    return null;
+  } catch {
+    // No results file: the suite never produced one.
+    return { passed: 0, failed: 0, flaky: 0, skipped: 0, hasResults: false };
   }
 }
 
-function duration(ms) {
-  const total = Math.round(ms / 1000);
-  return total >= 60 ? `${Math.floor(total / 60)}m ${total % 60}s` : `${total}s`;
+const stats = await readStats();
+const total = stats.passed + stats.failed + stats.flaky + stats.skipped;
+const ok = stats.hasResults && jobStatus === 'success' && stats.failed === 0;
+const emoji = ok ? '✅' : '❌';
+const statusText = stats.hasResults ? (ok ? 'PASSED' : 'FAILED') : 'NO RESULTS';
+
+const summaryFields = [
+  { type: 'mrkdwn', text: `*📊 Total:*\n${total}` },
+  { type: 'mrkdwn', text: `*✅ Passed:*\n${stats.passed}` },
+];
+
+const detailFields = [
+  { type: 'mrkdwn', text: `*❌ Failed:*\n${stats.failed}` },
+  { type: 'mrkdwn', text: `*⚠️ Skipped:*\n${stats.skipped}` },
+];
+
+if (stats.flaky) {
+  detailFields.push({ type: 'mrkdwn', text: `*🔁 Flaky:*\n${stats.flaky}` });
 }
 
-function buildMessage(stats) {
-  if (!stats) {
-    return {
-      text: `:warning: ${brand} Automation Report — no results produced`,
+const payload = {
+  attachments: [
+    {
+      color: ok ? '#36a64f' : '#ff0000',
       blocks: [
+        {
+          type: 'header',
+          text: { type: 'plain_text', text: `${emoji} ${suiteName}` },
+        },
+        {
+          type: 'section',
+          fields: [
+            { type: 'mrkdwn', text: `*Status:*\n${emoji} ${statusText}` },
+            { type: 'mrkdwn', text: `*Triggered By:*\n${event}` },
+          ],
+        },
+        { type: 'divider' },
+        { type: 'section', text: { type: 'mrkdwn', text: '*🤖 Test Results Summary*' } },
+        { type: 'section', fields: summaryFields },
+        { type: 'section', fields: detailFields },
+        { type: 'divider' },
         {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `:warning: *${brand} Automation Report*\nThe run produced no results file — the suite likely failed to start.`,
+            text: `*📄 Full report & artifacts:*\n<${runUrl}|Open the GitHub Actions run>`,
           },
         },
+        { type: 'context', elements: [{ type: 'mrkdwn', text: footer }] },
       ],
-    };
-  }
-
-  const total = stats.passed + stats.failed + stats.flaky + stats.skipped;
-  const icon = stats.ok ? ':white_check_mark:' : ':x:';
-  const status = stats.ok ? 'PASSED' : 'FAILED';
-
-  const fields = [
-    { type: 'mrkdwn', text: `*Status:*\n${icon} ${status}` },
-    { type: 'mrkdwn', text: `*Triggered By:*\n${trigger}` },
-  ];
-
-  const counts = [
-    { type: 'mrkdwn', text: `*:bar_chart: Total:*\n${total}` },
-    { type: 'mrkdwn', text: `*:white_check_mark: Passed:*\n${stats.passed}` },
-  ];
-
-  if (stats.failed) {
-    counts.push({ type: 'mrkdwn', text: `*:x: Failed:*\n${stats.failed}` });
-  }
-  if (stats.flaky) {
-    counts.push({ type: 'mrkdwn', text: `*:warning: Flaky:*\n${stats.flaky}` });
-  }
-  if (stats.skipped) {
-    counts.push({
-      type: 'mrkdwn',
-      text: `*:heavy_minus_sign: Skipped:*\n${stats.skipped}`,
-    });
-  }
-
-  const blocks = [
-    {
-      type: 'section',
-      text: { type: 'mrkdwn', text: `${icon} *${brand} Automation Report*` },
     },
-    { type: 'section', fields },
-    { type: 'divider' },
-    { type: 'section', text: { type: 'mrkdwn', text: ':robot_face: *Test Results Summary*' } },
-    { type: 'section', fields: counts },
-    {
-      type: 'context',
-      elements: [{ type: 'mrkdwn', text: `Duration: ${duration(stats.durationMs)}` }],
-    },
-  ];
-
-  if (runUrl) {
-    blocks.push({
-      type: 'actions',
-      elements: [
-        {
-          type: 'button',
-          text: { type: 'plain_text', text: 'View run' },
-          url: runUrl,
-        },
-      ],
-    });
-  }
-
-  return { text: `${icon} ${brand} Automation Report — ${status} (${stats.passed}/${total})`, blocks };
-}
-
-const stats = await readStats();
-const message = buildMessage(stats);
+  ],
+};
 
 if (!webhook) {
-  console.error('SLACK_WEBHOOK_URL is not set — printing the payload instead.');
-  console.log(JSON.stringify(message, null, 2));
+  console.error('SLACK_WEBHOOK_URL is not set — writing the payload instead.');
+  await writeFile('slack-payload.json', JSON.stringify(payload, null, 2));
+  console.log(JSON.stringify(payload, null, 2));
   process.exit(0);
 }
 
 const response = await fetch(webhook, {
   method: 'POST',
   headers: { 'content-type': 'application/json' },
-  body: JSON.stringify(message),
+  body: JSON.stringify(payload),
 });
 
-if (!response.ok) {
-  console.error(`Slack responded ${response.status}: ${await response.text()}`);
-} else {
-  console.log('Slack notification sent.');
-}
+console.log(
+  response.ok
+    ? 'Slack notification sent.'
+    : `Slack responded ${response.status}: ${await response.text()}`,
+);

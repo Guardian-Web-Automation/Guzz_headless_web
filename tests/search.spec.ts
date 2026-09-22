@@ -151,7 +151,7 @@ test.describe(`${brand.name} search @smoke`, () => {
     const expected = search.product;
 
     await test.step(`Tap ADD on the ${expected.name} suggestion`, async () => {
-      await app.cartDrawer.openWith(() =>
+      await app.cartDrawer.openAfterAdd(() =>
         app.searchDrawer.cardAddButton(expected.name).click(),
       );
     });
@@ -264,7 +264,7 @@ test.describe(`${brand.name} search @smoke`, () => {
     const urlBefore = page.url();
 
     await test.step(`Tap ADD on the ${expected.name} card`, async () => {
-      await app.cartDrawer.openWith(() =>
+      await app.cartDrawer.openAfterAdd(() =>
         app.search.cardByName(expected.name).addToCart(),
       );
     });

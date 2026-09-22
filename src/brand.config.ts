@@ -673,7 +673,7 @@ const guzz: BrandConfig = {
         crafting: 'Crafted with Centuries of Expertise',
         discover: 'Discover Before You Commit',
         notes: 'Shop By Note',
-        perfumers: 'Our Master Perfumers',
+        perfumers: 'Our Founders',
       },
       bestseller: {
         name: 'Sapphire Ocean',

@@ -67,14 +67,25 @@ export class CartDrawer extends BasePage {
     await expect(this.root).toBeVisible({ timeout });
   }
 
+  /** Header badge, read from outside the drawer. */
+  private get cartBadge(): Locator {
+    const header = brand.selectors.header;
+    return this.page.locator(header.root).locator(header.cartBadge).first();
+  }
+
+  private async cartCount(): Promise<number> {
+    if ((await this.cartBadge.count()) === 0) {
+      return 0;
+    }
+
+    return Number((await this.text(this.cartBadge)) || 0);
+  }
+
   /**
-   * Performs an action that should open the drawer, and repeats it if the
-   * drawer does not appear.
+   * Performs an action that opens the drawer without changing the cart —
+   * the header cart button — and repeats it if the drawer does not appear.
    *
-   * A single click is not reliable here: if it lands before the storefront
-   * has bound its handler, nothing happens at all and the drawer stays
-   * hidden forever — no amount of waiting recovers it, which is why whole
-   * test retries failed the same way on CI. Re-clicking does recover it.
+   * Safe to repeat precisely because the action adds nothing.
    */
   async openWith(
     action: () => Promise<void>,
@@ -84,7 +95,6 @@ export class CartDrawer extends BasePage {
       await action();
 
       try {
-        // Short probes while retries remain, then one full-length wait.
         await this.waitUntilOpen(attempt === attempts ? 30_000 : 10_000);
         return this;
       } catch (error) {
@@ -95,6 +105,61 @@ export class CartDrawer extends BasePage {
     }
 
     return this;
+  }
+
+  /**
+   * Performs an add-to-cart action and returns once the drawer is open.
+   *
+   * Repeating an add is NOT safe, so this never re-clicks blindly. A click
+   * that lands before the storefront binds its handler does nothing at all
+   * and must be repeated; a click that worked but whose drawer was slow to
+   * appear must not be — retrying that one adds the product twice, which is
+   * exactly what happened on CI and skewed every quantity and total after
+   * it. The header badge distinguishes the two: if it went up the add
+   * landed, so the drawer is opened from the header instead of adding again.
+   */
+  async openAfterAdd(action: () => Promise<void>): Promise<CartDrawer> {
+    const before = await this.cartCount();
+
+    await action();
+
+    if (await this.opened(20_000)) {
+      return this;
+    }
+
+    if (await this.cartCountRose(before)) {
+      await this.page
+        .locator(brand.selectors.header.cartButton)
+        .first()
+        .click();
+      await this.waitUntilOpen();
+      return this;
+    }
+
+    // Nothing was added, so the click never registered: repeat it.
+    await action();
+    await this.waitUntilOpen();
+    return this;
+  }
+
+  private async opened(timeout: number): Promise<boolean> {
+    try {
+      await this.waitUntilOpen(timeout);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async cartCountRose(before: number): Promise<boolean> {
+    try {
+      await expect
+        .poll(async () => this.cartCount(), { timeout: 10_000 })
+        .toBeGreaterThan(before);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /* ----------------------------------------------------------------- lines */

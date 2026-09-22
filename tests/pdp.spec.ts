@@ -407,7 +407,7 @@ test.describe(`${brand.name} product detail page @smoke`, () => {
     const scrollBefore = await settledScrollY(page);
 
     await test.step(`Tap ADD on the ${name} card`, async () => {
-      await app.cartDrawer.openWith(() =>
+      await app.cartDrawer.openAfterAdd(() =>
         app.product.recommendationCard(name).addToCart(),
       );
     });

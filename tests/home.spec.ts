@@ -183,7 +183,7 @@ test.describe(`${brand.name} home page @smoke`, () => {
     const scrollBefore = await settledScrollY(page);
 
     await test.step(`Tap ADD on the ${expected.name} card`, async () => {
-      await app.cartDrawer.openWith(() =>
+      await app.cartDrawer.openAfterAdd(() =>
         app.home.bestsellerCard(expected.name).addToCart(),
       );
     });
@@ -280,7 +280,7 @@ test.describe(`${brand.name} home page @smoke`, () => {
     const scrollBefore = await settledScrollY(page);
 
     await test.step(`Tap ADD on the ${expected.name} card`, async () => {
-      await app.cartDrawer.openWith(() =>
+      await app.cartDrawer.openAfterAdd(() =>
         app.home.discoverCard(expected.name).addToCart(),
       );
     });

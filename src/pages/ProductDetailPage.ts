@@ -171,7 +171,7 @@ export class ProductDetailPage extends BasePage {
 
   async addToCart(): Promise<CartDrawer> {
     const drawer = new CartDrawer(this.page);
-    return drawer.openWith(() => this.addToCartButton.click());
+    return drawer.openAfterAdd(() => this.addToCartButton.click());
   }
 
   /** Buy Now skips the cart and opens the checkout overlay directly. */
@@ -185,7 +185,7 @@ export class ProductDetailPage extends BasePage {
   async addBundle(): Promise<CartDrawer> {
     await this.bundleAddButton.scrollIntoViewIfNeeded();
     const drawer = new CartDrawer(this.page);
-    return drawer.openWith(() => this.bundleAddButton.click());
+    return drawer.openAfterAdd(() => this.bundleAddButton.click());
   }
 
   async bundlePriceValue(): Promise<number> {

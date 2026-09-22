@@ -174,10 +174,30 @@ export class ProductDetailPage extends BasePage {
     return drawer.openAfterAdd(() => this.addToCartButton.click());
   }
 
-  /** Buy Now skips the cart and opens the checkout overlay directly. */
+  /**
+   * Buy Now skips the cart and opens checkout directly.
+   *
+   * Like add-to-cart, a tap that lands before the storefront binds its
+   * handler does nothing whatsoever, and no amount of waiting recovers it.
+   * Repeating is safe only when nothing happened at all, so the retry is
+   * gated on still being on the product page with the button in reach — if
+   * a checkout had opened or a navigation started, that would not hold.
+   */
   async buyNow(): Promise<CheckoutPage> {
-    await this.buyNowButton.click();
     const checkout = new CheckoutPage(this.page);
+
+    await this.buyNowButton.click();
+
+    try {
+      await checkout.waitUntilOpen();
+      return checkout;
+    } catch (error) {
+      if (!(await this.buyNowButton.isVisible().catch(() => false))) {
+        throw error;
+      }
+    }
+
+    await this.buyNowButton.click();
     await checkout.waitUntilOpen();
     return checkout;
   }

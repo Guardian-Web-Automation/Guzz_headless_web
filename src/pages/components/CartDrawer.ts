@@ -128,6 +128,11 @@ export class CartDrawer extends BasePage {
     }
 
     if (await this.cartCountRose(before)) {
+      // The add landed, so opening the drawer from the header is safe — but
+      // only once whatever overlay the add was made from is out of the way.
+      // Adding from the search drawer leaves it open over the header, and
+      // its close button swallows every click aimed at the cart icon.
+      await this.closeBlockingDrawer();
       await this.page
         .locator(brand.selectors.header.cartButton)
         .first()
@@ -140,6 +145,19 @@ export class CartDrawer extends BasePage {
     await action();
     await this.waitUntilOpen();
     return this;
+  }
+
+  /** Closes the search drawer when it is covering the header. */
+  private async closeBlockingDrawer(): Promise<void> {
+    const search = brand.selectors.searchDrawer;
+    const openDrawer = this.page.locator(search.openRoot).first();
+
+    if (!(await openDrawer.isVisible().catch(() => false))) {
+      return;
+    }
+
+    await openDrawer.locator(search.closeButton).first().click();
+    await expect(openDrawer).toBeHidden();
   }
 
   private async opened(timeout: number): Promise<boolean> {
@@ -361,9 +379,30 @@ export class CartDrawer extends BasePage {
     return (await this.lines.count()) === 0;
   }
 
+  /**
+   * Hands over to checkout.
+   *
+   * Same guard as BUY NOW: a tap that lands before the storefront binds its
+   * handler does nothing at all, and waiting never recovers it. Repeating is
+   * only safe while nothing has happened — still in the drawer with the
+   * button in reach — so a checkout that did open, or a navigation already
+   * under way, raises the original error instead.
+   */
   async proceedToCheckout(): Promise<CheckoutPage> {
-    await this.checkoutButton.click();
     const checkout = new CheckoutPage(this.page);
+
+    await this.checkoutButton.click();
+
+    try {
+      await checkout.waitUntilOpen();
+      return checkout;
+    } catch (error) {
+      if (!(await this.checkoutButton.isVisible().catch(() => false))) {
+        throw error;
+      }
+    }
+
+    await this.checkoutButton.click();
     await checkout.waitUntilOpen();
     return checkout;
   }

@@ -49,6 +49,18 @@ export function discountPercent(comparePrice: number, price: number): number {
  * actually saw. Two equal reads in a row mean the page has settled.
  */
 export async function settledScrollY(page: Page): Promise<number> {
+  // Wait for the scroll lock to be released first. While a drawer is open
+  // the storefront pins <body> with `position: fixed`, and `window.scrollY`
+  // then reads 0 no matter where the shopper actually is — a value stable
+  // enough to fool the loop below, which is how a page sitting at 1756
+  // reported a scroll delta of 1756 rather than 0.
+  await expect
+    .poll(
+      async () => page.evaluate(() => getComputedStyle(document.body).position),
+      { timeout: 20_000 },
+    )
+    .not.toBe('fixed');
+
   let previous = -1;
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -111,6 +123,11 @@ export class BasePage {
   }
 
   async goto(path: string): Promise<void> {
+    // Deliberately the default `load`, not `domcontentloaded`. Until the
+    // storefront's scripts are bound its controls fall back to plain
+    // navigation — tapping ADD follows a bare href to /cart instead of
+    // opening the drawer — so returning early made tests interact with a
+    // half-initialised page and fail in ways that looked unrelated.
     await this.page.goto(path);
     await this.page.waitForLoadState('domcontentloaded');
   }

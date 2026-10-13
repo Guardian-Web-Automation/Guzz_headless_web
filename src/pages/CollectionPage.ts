@@ -76,15 +76,31 @@ export class CollectionPage extends ProductListPage {
     let current = await this.productCount();
 
     while (Date.now() < deadline) {
+      // A collection that fits in one batch has nothing left to load, so
+      // the storefront renders no sentinel at all. Waiting on the absent
+      // element costs the whole action timeout on every pass, which burnt
+      // this method's entire budget on the small collections and pushed
+      // GZ_MENU_05 — which loads three of them — past the test timeout.
+      const sentinel = this.page.locator(page$.sentinel);
+      const hasSentinel = (await sentinel.count()) > 0;
+
       // The fallback is a scripted scroll, not `mouse.wheel`: mobile WebKit
       // has no wheel input at all and throws outright, which took the whole
-      // collection suite down on iPhone.
-      await this.page
-        .locator(page$.sentinel)
-        .scrollIntoViewIfNeeded()
-        .catch(() =>
-          this.page.evaluate(() => window.scrollBy(0, window.innerHeight * 8)),
+      // collection suite down on iPhone. The short timeout keeps a sentinel
+      // that detaches mid-batch from costing the full budget too.
+      if (hasSentinel) {
+        await sentinel
+          .scrollIntoViewIfNeeded({ timeout: 2_000 })
+          .catch(() =>
+            this.page.evaluate(() =>
+              window.scrollBy(0, window.innerHeight * 8),
+            ),
+          );
+      } else {
+        await this.page.evaluate(() =>
+          window.scrollBy(0, window.innerHeight * 8),
         );
+      }
       await this.page.waitForTimeout(800);
       current = await this.productCount();
 

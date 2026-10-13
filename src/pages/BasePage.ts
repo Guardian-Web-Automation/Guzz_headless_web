@@ -128,7 +128,21 @@ export class BasePage {
     // navigation — tapping ADD follows a bare href to /cart instead of
     // opening the drawer — so returning early made tests interact with a
     // half-initialised page and fail in ways that looked unrelated.
-    await this.page.goto(path);
+    try {
+      await this.page.goto(path);
+    } catch (error) {
+      // The storefront occasionally cancels its own first navigation and
+      // Playwright surfaces that as ERR_ABORTED, in well under a second.
+      // Repeating a navigation is safe precisely because it changes
+      // nothing, so the second attempt is the real read; any other error
+      // is a genuine failure and is rethrown untouched.
+      if (!String(error).includes('net::ERR_ABORTED')) {
+        throw error;
+      }
+
+      await this.page.goto(path);
+    }
+
     await this.page.waitForLoadState('domcontentloaded');
   }
 

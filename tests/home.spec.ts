@@ -77,7 +77,14 @@ test.describe(`${brand.name} home page @smoke`, () => {
       await expect(app.home.heroSlides).toHaveCount(home.heroSlideCount);
     });
 
-    await test.step('Slide indicators are shown with exactly one active', async () => {
+    await test.step('Slide indicators match the number of slides', async () => {
+      // Indicators only exist when there is somewhere to move between. A
+      // hero holding a single banner is not a carousel and renders none.
+      if (home.heroSlideCount < 2) {
+        await expect(app.home.heroDots).toHaveCount(0);
+        return;
+      }
+
       await expect(app.home.heroDots).toHaveCount(home.heroSlideCount);
       expect(await app.home.activeHeroDots()).toBe(1);
     });

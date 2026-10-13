@@ -138,6 +138,11 @@ export type BrandConfig = {
       };
       /** A second, distinct product for multi-line cases. */
       secondProduct: { handle: string; name: string; price: number };
+      /**
+       * Copy shown in the cart header's offer pill. The storefront reuses
+       * this pill for whatever promotion is live, so it changes per campaign.
+       */
+      prepaidPill: RegExp;
       /** Order summary row labels, in render order. */
       summaryRows: string[];
     };
@@ -576,7 +581,7 @@ const guzz: BrandConfig = {
     filterCategories: ['Notes', 'Price', 'Availability'],
     filterNote: 'Cedar',
     priceRange: { from: 700, to: 1000 },
-    highestPrice: 1899,
+    highestPrice: 1578,
     sampleCard: {
       name: 'Discovery Set Male',
       tag: 'Men',
@@ -585,7 +590,7 @@ const guzz: BrandConfig = {
       comparePrice: 999,
       discount: '-25%',
     },
-    sampleProduct: { name: 'Sapphire Ocean', price: 999 },
+    sampleProduct: { name: 'Sapphire Ocean', price: 894 },
     menu: {
       categories: [
         {
@@ -667,7 +672,7 @@ const guzz: BrandConfig = {
         'uspStrip',
         'footer',
       ],
-      heroSlideCount: 2,
+      heroSlideCount: 1,
       sections: {
         bestsellers: 'Bestsellers',
         crafting: 'Crafted with Centuries of Expertise',
@@ -677,7 +682,7 @@ const guzz: BrandConfig = {
       },
       bestseller: {
         name: 'Sapphire Ocean',
-        price: 999,
+        price: 894,
         handle: 'sapphire-ocean',
       },
       discoverySets: [
@@ -702,24 +707,25 @@ const guzz: BrandConfig = {
         handle: 'oud',
         name: 'Øud',
         variant: '50ml',
-        price: 999,
+        price: 894,
         comparePrice: 1399,
       },
-      secondProduct: { handle: 'pine-noir', name: 'Pine Noir', price: 999 },
+      secondProduct: { handle: 'pine-noir', name: 'Pine Noir', price: 894 },
+      prepaidPill: /festive deal/i,
       summaryRows: ['Subtotal', 'Taxes', 'Delivery'],
     },
     search: {
       term: 'iris',
       sections: ['TRENDING NOW', 'PRODUCTS'],
       chip: 'Iris Santal',
-      product: { name: 'Iris Santal', price: 999, handle: 'iris-santal' },
+      product: { name: 'Iris Santal', price: 894, handle: 'iris-santal' },
     },
     pdp: {
       handle: 'sapphire-ocean',
       name: 'Sapphire Ocean',
-      price: 999,
+      price: 894,
       comparePrice: 1399,
-      discount: '-29% OFF',
+      discount: '-36% OFF',
       taxNote: 'inc. of all taxes',
       accordions: ['Description', 'Notes', 'ALL INGREDIENTS'],
       sections: {
@@ -731,10 +737,10 @@ const guzz: BrandConfig = {
       },
       bundle: {
         name: 'Ice & Fire Signature Combo',
-        price: 1899,
+        price: 1578,
         comparePrice: 2798,
       },
-      recommendation: { name: 'Midnight Woods', price: 999 },
+      recommendation: { name: 'Midnight Woods', price: 894 },
     },
   },
   selectors: {

@@ -148,6 +148,12 @@ export class HomePage extends ProductListPage {
       sel.heroActiveDotClass,
     );
 
+    // A hero holding a single banner is not a carousel: the storefront
+    // renders no dots at all, and that one slide is the one on screen.
+    if (classes.length === 0 && (await this.heroSlides.count()) === 1) {
+      return 0;
+    }
+
     const index = classes.findIndex(Boolean);
 
     if (index < 0) {

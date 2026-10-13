@@ -48,7 +48,7 @@ test.describe(`${brand.name} cart @smoke`, () => {
     await test.step('Header shows the back chevron, bag icon and prepaid pill', async () => {
       await expect(drawer.backButton).toBeVisible();
       await expect(drawer.bagIcon).toBeVisible();
-      await expect(drawer.prepaidPill).toHaveText(/prepaid/i);
+      await expect(drawer.prepaidPill).toHaveText(cart.prepaidPill);
     });
 
     await test.step('Line item is listed', async () => {

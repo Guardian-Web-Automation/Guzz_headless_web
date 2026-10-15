@@ -105,6 +105,26 @@ export async function loadStatus(page: Page, url: string): Promise<number> {
   throw lastError;
 }
 
+/**
+ * Whether a failed navigation is the storefront misbehaving rather than a
+ * real problem with the page.
+ *
+ * Two transient shapes show up against this site: it cancels its own first
+ * navigation, which Playwright reports as ERR_ABORTED in well under a
+ * second, and it stalls one, where the document arrives but a third-party
+ * script never settles so `load` never fires. Both clear on another
+ * attempt — a retry after a 45s stall has been seen to finish in 4.5s.
+ *
+ * Repeating a navigation is safe precisely because it changes nothing.
+ */
+function isTransientNavigation(error: unknown): boolean {
+  const text = String(error);
+
+  return (
+    text.includes('net::ERR_ABORTED') || text.includes('page.goto: Timeout')
+  );
+}
+
 export class BasePage {
   constructor(protected readonly page: Page) {}
 
@@ -128,22 +148,32 @@ export class BasePage {
     // navigation — tapping ADD follows a bare href to /cart instead of
     // opening the drawer — so returning early made tests interact with a
     // half-initialised page and fail in ways that looked unrelated.
-    try {
-      await this.page.goto(path);
-    } catch (error) {
-      // The storefront occasionally cancels its own first navigation and
-      // Playwright surfaces that as ERR_ABORTED, in well under a second.
-      // Repeating a navigation is safe precisely because it changes
-      // nothing, so the second attempt is the real read; any other error
-      // is a genuine failure and is rethrown untouched.
-      if (!String(error).includes('net::ERR_ABORTED')) {
-        throw error;
-      }
+    let lastError: unknown;
 
-      await this.page.goto(path);
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        // The first attempt gets the configured budget; later ones a
+        // smaller slice, so that stalling repeatedly still leaves the case
+        // room to report inside its own timeout rather than being killed
+        // part way through a navigation.
+        await this.page.goto(path, attempt === 1 ? {} : { timeout: 20_000 });
+        await this.page.waitForLoadState('domcontentloaded');
+        return;
+      } catch (error) {
+        if (!isTransientNavigation(error)) {
+          throw error;
+        }
+
+        lastError = error;
+
+        // Let the abandoned navigation settle before starting another.
+        // Issuing one immediately cancels the request still in flight, so
+        // the retry fails with an ERR_ABORTED of its own making.
+        await this.page.waitForTimeout(1_000);
+      }
     }
 
-    await this.page.waitForLoadState('domcontentloaded');
+    throw lastError;
   }
 
   async text(locator: Locator): Promise<string> {

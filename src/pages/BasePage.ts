@@ -143,21 +143,36 @@ export class BasePage {
   }
 
   async goto(path: string): Promise<void> {
-    // Deliberately the default `load`, not `domcontentloaded`. Until the
-    // storefront's scripts are bound its controls fall back to plain
-    // navigation — tapping ADD follows a bare href to /cart instead of
-    // opening the drawer — so returning early made tests interact with a
-    // half-initialised page and fail in ways that looked unrelated.
     let lastError: unknown;
 
-    // Two attempts, not more: the first gets the configured budget and the
-    // second a smaller slice, so a stall costs at most about 66s of the
-    // case's 120s. A third attempt pushed that past 87s, which turned a
-    // recoverable stall into a hard test timeout.
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
-        await this.page.goto(path, attempt === 1 ? {} : { timeout: 20_000 });
-        await this.page.waitForLoadState('domcontentloaded');
+        await this.page.goto(path, {
+          waitUntil: 'domcontentloaded',
+          ...(attempt === 1 ? {} : { timeout: 20_000 }),
+        });
+
+        // Then wait for `load`, but do not let it fail the case.
+        //
+        // The wait itself matters: until the storefront's scripts are
+        // bound its controls fall back to plain navigation — tapping ADD
+        // follows a bare href to /cart instead of opening the drawer — so
+        // returning at `domcontentloaded` alone made tests interact with a
+        // half-initialised page and fail in ways that looked unrelated.
+        //
+        // Hard-failing on it is what does not matter. `load` waits on
+        // every last subresource, so one hung pixel or payment script
+        // holds it open indefinitely while the page itself is perfectly
+        // usable: measured here, `load` normally follows the DOM by 0.3s
+        // to 1.3s, yet stalls past 45s often enough to have timed out
+        // GZ_CART_11, GZ_HOME_02, GZ_PDP_01 and GZ_PDP_04. Fifteen seconds
+        // is an order of magnitude beyond the real figure, so reaching it
+        // means a resource is hung rather than slow, and carrying on with
+        // a bound page beats failing a case over someone else's script.
+        await this.page
+          .waitForLoadState('load', { timeout: 15_000 })
+          .catch(() => undefined);
+
         return;
       } catch (error) {
         if (!isTransientNavigation(error)) {

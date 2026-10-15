@@ -41,6 +41,13 @@ export class ProductCard {
     await this.link.click();
   }
 
+  /** The product's handle, taken from the card's own link. */
+  async handleText(): Promise<string> {
+    const href = (await this.link.getAttribute('href')) ?? '';
+
+    return href.split('?')[0].replace(/\/$/, '').split('/').pop() ?? '';
+  }
+
   /** The product's name as the card renders it. */
   async nameText(): Promise<string> {
     return (await this.name.innerText()).trim();

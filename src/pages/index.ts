@@ -83,93 +83,67 @@ export async function openAddableProduct(
     options;
   const collection = new CollectionPage(page);
   const product = new ProductDetailPage(page);
-  const rejected: string[] = [];
+  const preference = brand.data.productPreference;
 
-  /** Whether the product now on screen can carry the case. */
-  const isUsable = async (): Promise<boolean> => {
-    // Wait for the action bar rather than counting it straight away: after
-    // a client-side navigation it has not painted yet, and a bare count
-    // reports a perfectly buyable product as unavailable. A sold-out
-    // product still renders the button, just disabled, so this waits for
-    // the real answer instead of racing it.
-    const button = product.addToCartButton;
-    const painted = await button
-      .waitFor({ state: 'visible', timeout: 10_000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (!painted || (await button.isDisabled())) {
-      return false;
-    }
-
-    if (!withBundle) {
-      return true;
-    }
-
-    // The bundle block renders lazily, so its absence only means anything
-    // once the page below the fold has actually been built. Scrolling the
-    // length of the page is what forces that; counting without it reports
-    // every product as bundle-less when the PDP was reached by a click
-    // rather than a fresh load.
-    if ((await product.bundle.count()) === 0) {
-      await product.scrollThroughPage().catch(() => undefined);
-    }
-
-    if ((await product.bundle.count()) === 0) {
-      return false;
-    }
-
-    await product.bundle
-      .scrollIntoViewIfNeeded({ timeout: 2_000 })
-      .catch(() => undefined);
-
-    return true;
-  };
-
-  for (const handle of brand.data.productPreference) {
-    await product.open(handle);
-
-    if (await isUsable()) {
-      return {
-        handle,
-        name: (await product.title.innerText()).trim(),
-        price: await product.currentPrice(),
-        comparePrice: await product.compareAtPrice(),
-      };
-    }
-
-    rejected.push(handle);
-  }
-
+  // Read stock from the grid rather than from each product's own page. The
+  // card already says whether the storefront will sell it, so ruling out a
+  // sold-out candidate costs nothing — where opening its page to find out
+  // costs a full navigation, and a navigation that stalls can eat the
+  // case's entire timeout before the candidate is even rejected.
   await collection.open(path);
 
-  for (let index = 0; index < (await collection.productCount()); index += 1) {
+  const stocked: AddableProduct[] = [];
+  const total = await collection.productCount();
+
+  for (let index = 0; index < total; index += 1) {
     const card = collection.card(index);
 
     if (await card.isSoldOut()) {
       continue;
     }
 
-    const name = await card.nameText();
-    const price = await card.priceValue();
-    const comparePrice = await card.comparePriceValue();
+    stocked.push({
+      handle: await card.handleText(),
+      name: await card.nameText(),
+      price: await card.priceValue(),
+      comparePrice: await card.comparePriceValue(),
+    });
+  }
 
-    // Wait for the URL itself, not just a load state: the click navigates
-    // client-side, so the load state settles against the collection
-    // document and callers would read the old URL back.
-    await card.open();
-    await page.waitForURL(/\/products\//);
-    await page.waitForLoadState('domcontentloaded');
+  // Preferred products first, best first, so a normal day runs against the
+  // same product it always has; everything else the collection is selling
+  // behind them, in grid order.
+  const ordered = [
+    ...preference.flatMap((handle) =>
+      stocked.filter((candidate) => candidate.handle === handle),
+    ),
+    ...stocked.filter((candidate) => !preference.includes(candidate.handle)),
+  ];
 
-    if (!(await isUsable())) {
-      rejected.push(name);
-      await collection.open(path);
-      continue;
+  const rejected: string[] = [];
+
+  for (const candidate of ordered) {
+    await product.open(candidate.handle);
+
+    if (!withBundle) {
+      return candidate;
     }
 
-    const handle = new URL(page.url()).pathname.split('/').pop() ?? '';
+    // The bundle block renders lazily, so its absence only means anything
+    // once the page below the fold has actually been built.
+    if ((await product.bundle.count()) === 0) {
+      await product.scrollThroughPage().catch(() => undefined);
+    }
 
-    return { handle, name, price, comparePrice };
+    if ((await product.bundle.count()) > 0) {
+      await product.bundle
+        .scrollIntoViewIfNeeded({ timeout: 2_000 })
+        .catch(() => undefined);
+
+      return candidate;
+    }
+
+    rejected.push(candidate.name);
   }
 
   throw new Error(

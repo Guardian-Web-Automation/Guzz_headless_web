@@ -150,12 +150,12 @@ export class BasePage {
     // half-initialised page and fail in ways that looked unrelated.
     let lastError: unknown;
 
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
+    // Two attempts, not more: the first gets the configured budget and the
+    // second a smaller slice, so a stall costs at most about 66s of the
+    // case's 120s. A third attempt pushed that past 87s, which turned a
+    // recoverable stall into a hard test timeout.
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
-        // The first attempt gets the configured budget; later ones a
-        // smaller slice, so that stalling repeatedly still leaves the case
-        // room to report inside its own timeout rather than being killed
-        // part way through a navigation.
         await this.page.goto(path, attempt === 1 ? {} : { timeout: 20_000 });
         await this.page.waitForLoadState('domcontentloaded');
         return;

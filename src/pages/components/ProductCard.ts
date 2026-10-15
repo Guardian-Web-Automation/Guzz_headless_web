@@ -41,6 +41,25 @@ export class ProductCard {
     await this.link.click();
   }
 
+  /** The product's name as the card renders it. */
+  async nameText(): Promise<string> {
+    return (await this.name.innerText()).trim();
+  }
+
+  /**
+   * Whether the storefront is refusing to sell this product right now. A
+   * sold-out card renders its ADD button disabled rather than hiding it.
+   */
+  async isSoldOut(): Promise<boolean> {
+    const button = this.addButton.first();
+
+    if ((await button.count()) === 0) {
+      return true;
+    }
+
+    return button.isDisabled();
+  }
+
   async openImage(): Promise<void> {
     await this.image.click();
   }

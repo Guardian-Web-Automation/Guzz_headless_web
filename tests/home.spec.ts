@@ -184,15 +184,21 @@ test.describe(`${brand.name} home page @smoke`, () => {
     await app.home.open();
     await app.home.bestsellers.scrollIntoViewIfNeeded();
 
-    const expected = home.bestseller;
+    // The rail's first buyable card rather than a named one: stock moves
+    // without warning, and this case is about ADD and the badge. Its name
+    // and price are read from the card itself, so the cart is still held
+    // to what the card advertised.
+    const card = await app.home.firstAddableBestseller();
+    const expected = {
+      name: await card.nameText(),
+      price: await card.priceValue(),
+    };
     const before = await app.home.header.cartCount();
     const urlBefore = page.url();
     const scrollBefore = await settledScrollY(page);
 
     await test.step(`Tap ADD on the ${expected.name} card`, async () => {
-      await app.cartDrawer.openAfterAdd(() =>
-        app.home.bestsellerCard(expected.name).addToCart(),
-      );
+      await app.cartDrawer.openAfterAdd(() => card.addToCart());
     });
 
     await test.step('Product is added at the listed price', async () => {

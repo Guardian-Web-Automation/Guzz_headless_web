@@ -131,7 +131,10 @@ test.describe(`${brand.name} collection page @smoke`, () => {
     const app = createPages(page);
     await app.collection.open(men.path);
 
-    const card = app.collection.cardByName(data.sampleProduct.name);
+    // Whichever product is buyable, not a named one: this case is about the
+    // ADD control and the badge, so a sold-out fixture product would report
+    // a failure that says nothing about either.
+    const card = await app.collection.firstAddableCard();
     const before = await app.collection.header.cartCount();
     const urlBefore = page.url();
 

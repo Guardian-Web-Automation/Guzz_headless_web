@@ -41,6 +41,30 @@ export abstract class ProductListPage extends BasePage {
     return texts.map(parsePrice);
   }
 
+  /**
+   * The first card the storefront will actually let you buy.
+   *
+   * Stock moves without warning, so a case that needs *a* buyable product
+   * rather than one specific product asks for one here. Naming the product
+   * instead leaves the case reporting a failure the moment that product
+   * sells out, which says nothing about the behaviour under test.
+   */
+  async firstAddableCard(): Promise<ProductCard> {
+    const total = await this.productCount();
+
+    for (let index = 0; index < total; index += 1) {
+      const card = this.card(index);
+
+      if (!(await card.isSoldOut())) {
+        return card;
+      }
+    }
+
+    throw new Error(
+      `No product on this page is in stock (${total} cards checked)`,
+    );
+  }
+
   async openProduct(index: number): Promise<ProductDetailPage> {
     await this.card(index).open();
     await this.page.waitForLoadState('domcontentloaded');

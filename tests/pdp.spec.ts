@@ -10,7 +10,12 @@
  */
 import { expect, test } from '@playwright/test';
 import { brand } from '../src/brand.config';
-import { createPages, escapeRegExp, settledScrollY } from '../src/pages';
+import {
+  createPages,
+  escapeRegExp,
+  openAddableProduct,
+  settledScrollY,
+} from '../src/pages';
 
 /** CSS uppercases many labels, so names are compared case-insensitively. */
 const caseless = (values: string[]): string[] =>
@@ -25,12 +30,13 @@ test.describe(`${brand.name} product detail page @smoke`, () => {
   }) => {
     const app = createPages(page);
 
-    await test.step('Open the product from the MEN collection', async () => {
-      await app.collection.open(men.path);
-      await app.collection.cardByName(pdp.name).open();
-      await page.waitForLoadState('domcontentloaded');
-      await expect(page).toHaveURL(new RegExp(`/products/${pdp.handle}`));
-    });
+    // Whichever preferred product is in stock today, rather than one fixed
+    // handle: a sold-out fixture would fail this case for reasons that have
+    // nothing to do with how the PDP renders.
+    const product = await test.step('Open a buyable product', async () =>
+      openAddableProduct(page, { path: men.path, withBundle: true }));
+
+    await expect(page).toHaveURL(new RegExp(`/products/${product.handle}`));
 
     await test.step('Gallery is shown', async () => {
       await expect(app.product.gallery).toBeVisible();
@@ -41,7 +47,9 @@ test.describe(`${brand.name} product detail page @smoke`, () => {
     });
 
     await test.step('Title block shows title, wishlist, share, subtitle and rating', async () => {
-      await expect(app.product.title).toHaveText(new RegExp(pdp.name, 'i'));
+      await expect(app.product.title).toHaveText(
+        new RegExp(escapeRegExp(product.name), 'i'),
+      );
       await expect(app.product.wishlistButton).toBeVisible();
       await expect(app.product.shareButton).toBeVisible();
       await expect(app.product.subtitle).toBeVisible();
@@ -123,7 +131,7 @@ test.describe(`${brand.name} product detail page @smoke`, () => {
     page,
   }) => {
     const app = createPages(page);
-    await app.product.open();
+    const product = await openAddableProduct(page, { path: men.path });
 
     const before = await app.product.header.cartCount();
     const urlBefore = page.url();
@@ -134,9 +142,9 @@ test.describe(`${brand.name} product detail page @smoke`, () => {
     await test.step('Confirmation shows the product in the cart', async () => {
       expect(await cart.lineCount()).toBe(1);
       expect((await cart.lineName(0)).toLowerCase()).toBe(
-        pdp.name.toLowerCase(),
+        product.name.toLowerCase(),
       );
-      expect(await cart.linePrice(0)).toBe(pdp.price);
+      expect(await cart.linePrice(0)).toBe(product.price);
     });
 
     await test.step('Badge increases by exactly one', async () => {
@@ -154,7 +162,7 @@ test.describe(`${brand.name} product detail page @smoke`, () => {
     page,
   }) => {
     const app = createPages(page);
-    await app.product.open();
+    const product = await openAddableProduct(page, { path: men.path });
 
     const checkout = await test.step('Tap BUY NOW', async () =>
       app.product.buyNow());
@@ -172,20 +180,20 @@ test.describe(`${brand.name} product detail page @smoke`, () => {
 
       await expect(async () =>
         expect(await checkout.lineItemsText()).toMatch(
-          new RegExp(escapeRegExp(pdp.name), 'i'),
+          new RegExp(escapeRegExp(product.name), 'i'),
         ),
       ).toPass();
     });
 
     await test.step('Order summary reconciles with one item at the product price', async () => {
       expect(await checkout.itemCount()).toBe(1);
-      expect(await checkout.payableAmount()).toBe(pdp.price);
+      expect(await checkout.payableAmount()).toBe(product.price);
 
       // Only GoKwik shows the struck-through original; Shopify's checkout
       // carries no compare-at price to assert against.
       if (flavour === 'gokwik') {
         await expect(checkout.originalPrice).toContainText(
-          String(pdp.comparePrice.toLocaleString('en-IN')),
+          String(product.comparePrice.toLocaleString('en-IN')),
         );
       }
     });
@@ -199,33 +207,42 @@ test.describe(`${brand.name} product detail page @smoke`, () => {
     page,
   }) => {
     const app = createPages(page);
-    await app.product.open();
+    // Only some products are bundled, and the one that is can sell out, so
+    // the case asks for a product that offers a bundle today and holds the
+    // cart to whatever that bundle advertised.
+    await openAddableProduct(page, { path: men.path, withBundle: true });
 
-    await test.step('Bundle card advertises the bundle price', async () => {
-      await expect(app.product.bundleName).toHaveText(
-        new RegExp(`^${escapeRegExp(pdp.bundle.name)}$`, 'i'),
-      );
-      expect(await app.product.bundlePriceValue()).toBe(pdp.bundle.price);
-      expect(await app.product.bundleComparePriceValue()).toBe(
-        pdp.bundle.comparePrice,
-      );
-    });
+    const bundle = await test.step(
+      'Bundle card advertises a price below the combined value',
+      async () => {
+        await app.product.bundle.scrollIntoViewIfNeeded();
+
+        const name = (await app.product.bundleName.innerText()).trim();
+        const price = await app.product.bundlePriceValue();
+        const comparePrice = await app.product.bundleComparePriceValue();
+
+        expect(name).not.toBe('');
+        expect(price).toBeLessThan(comparePrice);
+
+        return { name, price, comparePrice };
+      },
+    );
 
     const cart = await test.step('Tap ADD BUNDLE', async () =>
       app.product.addBundle());
 
-    await test.step('Cart holds the bundle at the bundle price', async () => {
+    await test.step('Cart holds the bundle at the advertised bundle price', async () => {
       expect(await cart.lineCount()).toBe(1);
       expect(await cart.lineName(0)).toMatch(
-        new RegExp(`^${escapeRegExp(pdp.bundle.name)}$`, 'i'),
+        new RegExp(`^${escapeRegExp(bundle.name)}$`, 'i'),
       );
-      expect(await cart.linePrice(0)).toBe(pdp.bundle.price);
+      expect(await cart.linePrice(0)).toBe(bundle.price);
     });
 
     await test.step('Order summary total is the bundle price, not the sum', async () => {
       await app.cart.open();
-      expect(await app.cart.estimatedTotal()).toBe(pdp.bundle.price);
-      expect(await app.cart.estimatedTotal()).not.toBe(pdp.bundle.comparePrice);
+      expect(await app.cart.estimatedTotal()).toBe(bundle.price);
+      expect(await app.cart.estimatedTotal()).not.toBe(bundle.comparePrice);
       await expect(app.cart.summaryTitle).toHaveText(/order summary/i);
     });
   });

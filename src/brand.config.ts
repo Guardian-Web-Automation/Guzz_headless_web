@@ -39,6 +39,13 @@ export type BrandConfig = {
     /** Expected number of products on the "all products" listing, at minimum. */
     minProductsOnListing: number;
     /**
+     * Products the suites would rather run against, best first, by handle.
+     * A case that needs a buyable product takes the first of these the
+     * storefront will actually sell, and falls back to whatever else the
+     * collection is selling if none of them are in stock.
+     */
+    productPreference: string[];
+    /**
      * Collections under test. `defaultSort` is per collection because a
      * storefront sets its own default sort order on each one.
      */
@@ -558,6 +565,7 @@ const guzz: BrandConfig = {
   data: {
     searchTerm: 'perfume',
     minProductsOnListing: 1,
+    productPreference: ['sapphire-ocean', 'iris-santal'],
     collections: {
       shopAll: {
         path: '/collections/all',
@@ -672,7 +680,7 @@ const guzz: BrandConfig = {
         'uspStrip',
         'footer',
       ],
-      heroSlideCount: 1,
+      heroSlideCount: 2,
       sections: {
         bestsellers: 'Bestsellers',
         crafting: 'Crafted with Centuries of Expertise',
@@ -711,7 +719,7 @@ const guzz: BrandConfig = {
         comparePrice: 1399,
       },
       secondProduct: { handle: 'pine-noir', name: 'Pine Noir', price: 894 },
-      prepaidPill: /festive deal/i,
+      prepaidPill: /get extra 5% off with prepaid/i,
       summaryRows: ['Subtotal', 'Taxes', 'Delivery'],
     },
     search: {

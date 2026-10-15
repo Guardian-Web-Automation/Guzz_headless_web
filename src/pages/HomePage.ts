@@ -185,6 +185,23 @@ export class HomePage extends ProductListPage {
     );
   }
 
+  /** The first bestseller the storefront will actually let you buy. */
+  async firstAddableBestseller(): Promise<ProductCard> {
+    const total = await this.bestsellerCards.count();
+
+    for (let index = 0; index < total; index += 1) {
+      const card = new ProductCard(this.bestsellerCards.nth(index));
+
+      if (!(await card.isSoldOut())) {
+        return card;
+      }
+    }
+
+    throw new Error(
+      `No bestseller is in stock (${total} cards checked)`,
+    );
+  }
+
   discoverCard(name: string): ProductCard {
     return new ProductCard(
       this.discoverCards.filter({ hasText: name }).first(),

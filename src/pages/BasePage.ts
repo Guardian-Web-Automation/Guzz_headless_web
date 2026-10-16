@@ -4,6 +4,7 @@
  * Brand-agnostic: holds no selector, path or label of its own.
  */
 import { expect, Locator, Page } from '@playwright/test';
+import { brand } from '../brand.config';
 
 /** Escapes a plain string so it can be used inside a RegExp. */
 export function escapeRegExp(value: string): string {
@@ -171,6 +172,19 @@ export class BasePage {
         // a bound page beats failing a case over someone else's script.
         await this.page
           .waitForLoadState('load', { timeout: 15_000 })
+          .catch(() => undefined);
+
+        // `load` is only a proxy for the thing that actually matters, and
+        // the two can come apart: the scripts bind in their own time, and a
+        // control driven before then falls back to plain navigation. So
+        // wait for the storefront to say so itself. Normally this is
+        // already true by `load` and costs nothing.
+        await this.page
+          .waitForFunction(
+            (flag) => flag in window,
+            brand.readySignal,
+            { timeout: 15_000 },
+          )
           .catch(() => undefined);
 
         return;

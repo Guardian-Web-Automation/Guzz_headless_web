@@ -66,6 +66,17 @@ jobs:
           path: results/junit.xml
           retention-days: 30
 
+      - name: Update Google Sheet report
+        if: always()
+        continue-on-error: true
+        env:
+          SHEET_WEBHOOK_URL: ${{ secrets.SHEET_WEBHOOK_URL }}
+          SHEET_TOKEN: ${{ secrets.SHEET_TOKEN }}
+          PROJECT_NAME: GUZZ
+          RESULTS_FILE: results/junit.xml
+        run: node .github/scripts/report-to-sheet.mjs
+
+
       - name: Send Slack notification
         if: always() && env.SLACK_WEBHOOK_URL != ''
         env:

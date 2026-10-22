@@ -40,8 +40,9 @@ test.describe(`${brand.name} product detail page @smoke`, () => {
 
     await test.step('Gallery is shown', async () => {
       await expect(app.product.gallery).toBeVisible();
-      // Dot indicators are the mobile gallery control; desktop shows
-      // prev/next arrows instead. Either is a valid way to page it.
+      // The gallery is paged by a thumbnail strip on desktop and by dot
+      // indicators on mobile, so assert that whichever one this viewport
+      // offers is actually on screen rather than naming one of them.
       await expect(app.product.galleryDots).toBeAttached();
       await expect(app.product.galleryNavigation).toBeVisible();
     });
@@ -306,9 +307,9 @@ test.describe(`${brand.name} product detail page @smoke`, () => {
 
       await test.step('Average in the text matches the stars aria-label', async () => {
         const average = await app.product.reviewsAverageValue();
-        await expect(app.product.reviewsSummaryStars).toHaveAttribute(
+        await expect(app.product.reviewsSummaryStarsImage).toHaveAttribute(
           'aria-label',
-          new RegExp(`${average}`),
+          new RegExp(escapeRegExp(String(average))),
         );
         expect(average).toBeGreaterThan(0);
         expect(average).toBeLessThanOrEqual(5);

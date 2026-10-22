@@ -24,8 +24,19 @@ export class ProductDetailPage extends BasePage {
   readonly galleryDot = this.page.locator(sel.galleryDot);
   readonly galleryPrevButton = this.page.locator(sel.galleryPrev);
   readonly galleryNextButton = this.page.locator(sel.galleryNext);
-  /** Desktop navigates the gallery with arrows, mobile with dot indicators. */
-  readonly galleryNavigation = this.visibleOf(sel.galleryNext, sel.galleryDots);
+  readonly galleryThumbs = this.page.locator(sel.galleryThumbs);
+  /**
+   * Whichever control this viewport offers for paging the gallery: a
+   * thumbnail strip on desktop, dot indicators on mobile. The prev/next
+   * arrows are still in the markup but the storefront keeps them
+   * `display: none` at every width, so they are listed last and only
+   * matter if it starts showing them again.
+   */
+  readonly galleryNavigation = this.visibleOf(
+    sel.galleryThumbs,
+    sel.galleryDots,
+    sel.galleryNext,
+  );
   readonly title = this.page.locator(sel.title).first();
   readonly wishlistButton = this.page.locator(sel.wishlistButton).first();
   readonly shareButton = this.page.locator(sel.shareButton).first();
@@ -76,6 +87,9 @@ export class ProductDetailPage extends BasePage {
   readonly reviewsTitle = this.page.locator(reviews$.widgetTitle).first();
   readonly reviewsSummaryStars = this.page
     .locator(reviews$.summaryStars)
+    .first();
+  readonly reviewsSummaryStarsImage = this.page
+    .locator(reviews$.summaryStarsImage)
     .first();
   readonly reviewsAverage = this.page.locator(reviews$.average).first();
   readonly reviewsCountText = this.page.locator(reviews$.countText).first();

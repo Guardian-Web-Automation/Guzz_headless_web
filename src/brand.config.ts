@@ -349,6 +349,7 @@ export type Selectors = {
     galleryDot: string;
     galleryPrev: string;
     galleryNext: string;
+    galleryThumbs: string;
     title: string;
     wishlistButton: string;
     shareButton: string;
@@ -399,6 +400,12 @@ export type Selectors = {
     widgetReady: string;
     widgetTitle: string;
     summaryStars: string;
+    /**
+     * The element carrying the rating as text for assistive tech. Judge.me
+     * puts the `aria-label` on this inner `role="img"` span, not on the
+     * summary block around it.
+     */
+    summaryStarsImage: string;
     average: string;
     countText: string;
     verifiedBadge: string;
@@ -909,6 +916,7 @@ const guzz: BrandConfig = {
       galleryDot: '.pdp-gallery-dot',
       galleryPrev: '.pdp-gallery-arrow--prev',
       galleryNext: '.pdp-gallery-arrow--next',
+      galleryThumbs: '.pdp-gallery-thumbs',
       title: '.pdp-title',
       wishlistButton: '.pdp-actions [aria-label="Add to wishlist"]',
       shareButton: '.pdp-actions [aria-label="Share"]',
@@ -957,6 +965,7 @@ const guzz: BrandConfig = {
       widgetReady: '.jdgm-widget.jdgm--done-setup-widget',
       widgetTitle: '.jdgm-rev-widg__title',
       summaryStars: '.jdgm-rev-widg__summary-stars',
+      summaryStarsImage: '.jdgm-rev-widg__summary-stars-img',
       average: '.jdgm-rev-widg__summary-average',
       countText: '.jdgm-rev-widg__summary-text',
       verifiedBadge: '.jdgm-verified-checkmark',

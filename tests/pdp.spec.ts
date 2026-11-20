@@ -12,6 +12,7 @@ import { expect, test } from '@playwright/test';
 import { brand } from '../src/brand.config';
 import {
   createPages,
+  discountPercent,
   escapeRegExp,
   openAddableProduct,
   settledScrollY,
@@ -104,21 +105,29 @@ test.describe(`${brand.name} product detail page @smoke`, () => {
     const app = createPages(page);
     await app.product.open();
 
-    await test.step('Selling price and struck-through MRP are correct', async () => {
-      expect(await app.product.currentPrice()).toBe(pdp.price);
-      expect(await app.product.compareAtPrice()).toBe(pdp.comparePrice);
+    // Read both figures off the page and hold them to each other. What
+    // matters is that the block is internally consistent -- a selling price
+    // below the MRP, struck through, with a badge that states the discount
+    // those two numbers actually imply. Pinning the rupee figures instead
+    // only records what the catalogue cost on the day they were written.
+    const price = await app.product.currentPrice();
+    const comparePrice = await app.product.compareAtPrice();
+
+    await test.step('Selling price sits below the struck-through MRP', async () => {
+      expect(price).toBeGreaterThan(0);
+      expect(price).toBeLessThan(comparePrice);
       await expect(app.product.comparePrice).toHaveCSS(
         'text-decoration-line',
         'line-through',
       );
     });
 
-    await test.step('Discount badge is correct and matches the two prices', async () => {
-      await expect(app.product.discountBadge).toHaveText(pdp.discount);
-
+    await test.step('Discount badge states the saving those prices imply', async () => {
       const advertised = await app.product.advertisedDiscount();
-      const actual = ((pdp.comparePrice - pdp.price) / pdp.comparePrice) * 100;
-      expect(advertised).toBeCloseTo(Math.round(actual), 0);
+      expect(advertised).toBeCloseTo(
+        Math.round(discountPercent(comparePrice, price)),
+        0,
+      );
     });
 
     await test.step('Inclusive tax note is shown below the price', async () => {

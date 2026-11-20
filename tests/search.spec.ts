@@ -131,7 +131,8 @@ test.describe(`${brand.name} search @smoke`, () => {
       await expect(app.product.title).toHaveText(
         new RegExp(expected.name, 'i'),
       );
-      expect(await app.product.currentPrice()).toBe(expected.price);
+      // The suggestion's own price is the expectation: the PDP must ask
+      // for whatever the overlay just advertised, at today's prices.
       expect(await app.product.currentPrice()).toBe(suggestedPrice);
     });
   });
@@ -149,6 +150,11 @@ test.describe(`${brand.name} search @smoke`, () => {
     await app.searchDrawer.type(search.term);
 
     const expected = search.product;
+    // What the suggestion card is advertising right now, so the cart is
+    // held to today's figure rather than to a remembered one.
+    const suggestedPrice = await app.searchDrawer.cardPriceValue(
+      expected.name,
+    );
 
     await test.step(`Tap ADD on the ${expected.name} suggestion`, async () => {
       await app.cartDrawer.openAfterAdd(() =>
@@ -162,7 +168,7 @@ test.describe(`${brand.name} search @smoke`, () => {
       expect((await cart.lineName(0)).toLowerCase()).toBe(
         expected.name.toLowerCase(),
       );
-      expect(await cart.linePrice(0)).toBe(expected.price);
+      expect(await cart.linePrice(0)).toBe(suggestedPrice);
       await cart.close();
     });
 
@@ -247,7 +253,6 @@ test.describe(`${brand.name} search @smoke`, () => {
       await expect(app.product.title).toHaveText(
         new RegExp(expected.name, 'i'),
       );
-      expect(await app.product.currentPrice()).toBe(expected.price);
       expect(await app.product.currentPrice()).toBe(listedPrice);
     });
   });
@@ -260,6 +265,7 @@ test.describe(`${brand.name} search @smoke`, () => {
 
     await app.search.open(search.term);
 
+    const listedPrice = await app.search.cardByName(expected.name).priceValue();
     const before = await app.search.header.cartCount();
     const urlBefore = page.url();
 
@@ -275,7 +281,7 @@ test.describe(`${brand.name} search @smoke`, () => {
       expect((await cart.lineName(0)).toLowerCase()).toBe(
         expected.name.toLowerCase(),
       );
-      expect(await cart.linePrice(0)).toBe(expected.price);
+      expect(await cart.linePrice(0)).toBe(listedPrice);
       await cart.close();
     });
 

@@ -71,19 +71,21 @@ export type BrandConfig = {
     filterNote: string;
     /** Range used by the price-filter test. */
     priceRange: { from: number; to: number };
-    /** Highest catalogue price, shown as a hint in the price filter. */
-    highestPrice: number;
-    /** A product whose card is inspected element by element. */
+    /**
+     * A product whose card is inspected element by element.
+     *
+     * Identity only. Prices are read from the page at run time and held to
+     * each other, because the catalogue is repriced whenever a promotion
+     * starts or ends and a figure recorded here would turn each of those
+     * into a suite-wide failure that says nothing about the storefront.
+     */
     sampleCard: {
       name: string;
       tag: string;
       variant: string;
-      price: number;
-      comparePrice: number;
-      discount: string;
     };
     /** A product opened from a card to verify PDP hand-off. */
-    sampleProduct: { name: string; price: number };
+    sampleProduct: { name: string };
     /** Data the navigation-menu suite runs against. */
     menu: {
       /**
@@ -137,9 +139,9 @@ export type BrandConfig = {
         perfumers: string;
       };
       /** A product in the bestsellers rail. */
-      bestseller: { name: string; price: number; handle: string };
+      bestseller: { name: string; handle: string };
       /** Cards in the discovery row. */
-      discoverySets: { name: string; price: number; handle: string }[];
+      discoverySets: { name: string; handle: string }[];
       /** Lifestyle tiles: visible label -> destination path. */
       genderTiles: { label: string; path: string }[];
     };
@@ -150,11 +152,9 @@ export type BrandConfig = {
         handle: string;
         name: string;
         variant: string;
-        price: number;
-        comparePrice: number;
       };
       /** A second, distinct product for multi-line cases. */
-      secondProduct: { handle: string; name: string; price: number };
+      secondProduct: { handle: string; name: string };
       /**
        * Copy shown in the cart header's offer pill. The storefront reuses
        * this pill for whatever promotion is live, so it changes per campaign.
@@ -171,15 +171,12 @@ export type BrandConfig = {
       /** A trending chip offered for the term. */
       chip: string;
       /** A product the term matches. */
-      product: { name: string; price: number; handle: string };
+      product: { name: string; handle: string };
     };
     /** The product the PDP suite runs against. */
     pdp: {
       handle: string;
       name: string;
-      price: number;
-      comparePrice: number;
-      discount: string;
       taxNote: string;
       /** Accordion rows in render order. */
       accordions: string[];
@@ -192,9 +189,9 @@ export type BrandConfig = {
         recommendations: string;
       };
       /** The bundle offered on this product's page. */
-      bundle: { name: string; price: number; comparePrice: number };
+      bundle: { name: string };
       /** A card in the recommendations rail. */
-      recommendation: { name: string; price: number };
+      recommendation: { name: string };
     };
   };
   selectors: Selectors;
@@ -609,16 +606,12 @@ const guzz: BrandConfig = {
     filterCategories: ['Notes', 'Price', 'Availability'],
     filterNote: 'Cedar',
     priceRange: { from: 700, to: 1000 },
-    highestPrice: 1799,
     sampleCard: {
       name: 'Discovery Set Male',
       tag: 'Men',
       variant: '25ml',
-      price: 749,
-      comparePrice: 999,
-      discount: '-25%',
     },
-    sampleProduct: { name: 'Sapphire Ocean', price: 999 },
+    sampleProduct: { name: 'Sapphire Ocean' },
     menu: {
       categories: [
         {
@@ -708,22 +701,10 @@ const guzz: BrandConfig = {
         notes: 'Shop By Note',
         perfumers: 'Our Founders',
       },
-      bestseller: {
-        name: 'Sapphire Ocean',
-        price: 999,
-        handle: 'sapphire-ocean',
-      },
+      bestseller: { name: 'Sapphire Ocean', handle: 'sapphire-ocean' },
       discoverySets: [
-        {
-          name: 'Discovery Set Male',
-          price: 749,
-          handle: 'discovery-set-male',
-        },
-        {
-          name: 'Discovery Set Female',
-          price: 749,
-          handle: 'discovery-set-female',
-        },
+        { name: 'Discovery Set Male', handle: 'discovery-set-male' },
+        { name: 'Discovery Set Female', handle: 'discovery-set-female' },
       ],
       genderTiles: [
         { label: 'SHOP MEN', path: '/collections/mens-perfume-collection' },
@@ -735,10 +716,8 @@ const guzz: BrandConfig = {
         handle: 'oud',
         name: 'Øud',
         variant: '50ml',
-        price: 999,
-        comparePrice: 1399,
       },
-      secondProduct: { handle: 'pine-noir', name: 'Pine Noir', price: 999 },
+      secondProduct: { handle: 'pine-noir', name: 'Pine Noir' },
       prepaidPill: /get extra 5% off with prepaid/i,
       summaryRows: ['Subtotal', 'Taxes', 'Delivery'],
     },
@@ -746,14 +725,11 @@ const guzz: BrandConfig = {
       term: 'iris',
       sections: ['TRENDING NOW', 'PRODUCTS'],
       chip: 'Iris Santal',
-      product: { name: 'Iris Santal', price: 999, handle: 'iris-santal' },
+      product: { name: 'Iris Santal', handle: 'iris-santal' },
     },
     pdp: {
       handle: 'sapphire-ocean',
       name: 'Sapphire Ocean',
-      price: 999,
-      comparePrice: 1399,
-      discount: '-29% OFF',
       taxNote: 'inc. of all taxes',
       accordions: ['Description', 'Notes', 'ALL INGREDIENTS'],
       sections: {
@@ -763,12 +739,8 @@ const guzz: BrandConfig = {
         reviews: 'Customer Reviews',
         recommendations: 'You May Also Like',
       },
-      bundle: {
-        name: 'Ice & Fire Signature Combo',
-        price: 1799,
-        comparePrice: 2798,
-      },
-      recommendation: { name: 'Midnight Woods', price: 999 },
+      bundle: { name: 'Ice & Fire Signature Combo' },
+      recommendation: { name: 'Midnight Woods' },
     },
   },
   selectors: {

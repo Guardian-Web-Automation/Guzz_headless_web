@@ -172,7 +172,8 @@ test.describe(`${brand.name} home page @smoke`, () => {
       await expect(app.product.title).toHaveText(
         new RegExp(expected.name, 'i'),
       );
-      expect(await app.product.currentPrice()).toBe(expected.price);
+      // The card's own price is the expectation: the PDP must ask for
+      // whatever the card just advertised, at today's prices.
       expect(await app.product.currentPrice()).toBe(listedPrice);
     });
   });
@@ -275,7 +276,8 @@ test.describe(`${brand.name} home page @smoke`, () => {
       await expect(app.product.title).toHaveText(
         new RegExp(expected.name, 'i'),
       );
-      expect(await app.product.currentPrice()).toBe(expected.price);
+      // The card's own price is the expectation: the PDP must ask for
+      // whatever the card just advertised, at today's prices.
       expect(await app.product.currentPrice()).toBe(listedPrice);
     });
   });
@@ -288,6 +290,11 @@ test.describe(`${brand.name} home page @smoke`, () => {
     await app.home.discover.scrollIntoViewIfNeeded();
 
     const expected = home.discoverySets[0];
+    // The price the card is advertising right now, so the cart is held to
+    // today's figure rather than to one remembered in the config.
+    const listedPrice = await app.home
+      .discoverCard(expected.name)
+      .priceValue();
     const before = await app.home.header.cartCount();
     const urlBefore = page.url();
     const scrollBefore = await settledScrollY(page);
@@ -304,7 +311,7 @@ test.describe(`${brand.name} home page @smoke`, () => {
       expect((await cart.lineName(0)).toLowerCase()).toBe(
         expected.name.toLowerCase(),
       );
-      expect(await cart.linePrice(0)).toBe(expected.price);
+      expect(await cart.linePrice(0)).toBe(listedPrice);
       await cart.close();
     });
 

@@ -12,7 +12,7 @@
  */
 import { expect, test } from '@playwright/test';
 import { brand } from '../src/brand.config';
-import { createPages } from '../src/pages';
+import { createPages, discountPercent } from '../src/pages';
 
 const data = brand.data;
 const shopAll = data.collections.shopAll;
@@ -87,9 +87,20 @@ test.describe(`${brand.name} collection page @smoke`, () => {
       await expect(card.genderTag).toHaveText(expected.tag);
       await expect(card.name).toHaveText(expected.name);
       await expect(card.variant).toHaveText(expected.variant);
-      expect(await card.priceValue()).toBe(expected.price);
-      expect(await card.comparePriceValue()).toBe(expected.comparePrice);
-      await expect(card.discount).toHaveText(expected.discount);
+      // The card's three figures are held to each other rather than to
+      // remembered rupee values: a selling price under the MRP, with a badge
+      // stating the saving those two imply. That stays true through every
+      // repricing, and still catches a card that renders a placeholder or
+      // contradicts itself.
+      const price = await card.priceValue();
+      const comparePrice = await card.comparePriceValue();
+
+      expect(price).toBeGreaterThan(0);
+      expect(price).toBeLessThan(comparePrice);
+      expect(await card.discountPercentValue()).toBeCloseTo(
+        Math.round(discountPercent(comparePrice, price)),
+        0,
+      );
       await expect(card.addButton).toHaveText(/add/i);
 
       // Rating drifts as reviews come in, so the format is asserted rather
@@ -120,7 +131,8 @@ test.describe(`${brand.name} collection page @smoke`, () => {
       await expect(app.product.title).toHaveText(
         new RegExp(expected.name, 'i'),
       );
-      expect(await app.product.currentPrice()).toBe(expected.price);
+      // What matters is that the PDP asks for the same price the grid
+      // advertised, whatever that price happens to be today.
       expect(await app.product.currentPrice()).toBe(listedPrice);
     });
   });
@@ -222,6 +234,11 @@ test.describe(`${brand.name} collection page @smoke`, () => {
     const app = createPages(page);
     await app.collection.open();
 
+    // Read the catalogue's dearest product before sorting, so the sort is
+    // measured against what the shop is actually selling today.
+    await app.collection.loadAllProducts();
+    const highest = Math.max(...(await app.collection.allPrices()));
+
     await test.step('Sort by Price (High to Low)', async () => {
       await app.collection.sortBy('Price (High to Low)');
     });
@@ -235,7 +252,7 @@ test.describe(`${brand.name} collection page @smoke`, () => {
 
         expect(prices.length).toBeGreaterThan(3);
         expect(prices).toEqual([...prices].sort((a, b) => b - a));
-        expect(prices[0]).toBe(data.highestPrice);
+        expect(prices[0]).toBe(highest);
       }).toPass({ timeout: 60_000 });
     });
   });
@@ -302,13 +319,26 @@ test.describe(`${brand.name} collection page @smoke`, () => {
     const app = createPages(page);
     await app.collection.open();
 
-    const { from, to } = data.priceRange;
+    // Take the window from what the catalogue is selling rather than from a
+    // fixed band of rupees: a repricing moves every product out of a
+    // remembered window at once, and the case then fails for having found
+    // nothing rather than for anything the filter did wrong.
+    await app.collection.loadAllProducts();
+    const tiers = [...new Set(await app.collection.allPrices())].sort(
+      (a, b) => a - b,
+    );
+    expect(tiers.length).toBeGreaterThan(1);
+
+    const highest = tiers[tiers.length - 1];
+    const from = tiers[0];
+    // Stop one tier below the top so the dearest product must be excluded.
+    const to = tiers[tiers.length - 2];
 
     await app.collection.openFilterDrawer();
     await app.collection.selectFilterCategory('Price');
 
     await test.step('Price hint advertises the highest catalogue price', async () => {
-      expect(await app.collection.highestPriceHint()).toBe(data.highestPrice);
+      expect(await app.collection.highestPriceHint()).toBe(highest);
     });
 
     await test.step(`Enter ${from}-${to} and apply`, async () => {
@@ -326,7 +356,7 @@ test.describe(`${brand.name} collection page @smoke`, () => {
           expect(price).toBeGreaterThanOrEqual(from);
           expect(price).toBeLessThanOrEqual(to);
         }
-        expect(prices).not.toContain(data.highestPrice);
+        expect(prices).not.toContain(highest);
       }).toPass({ timeout: 60_000 });
     });
   });

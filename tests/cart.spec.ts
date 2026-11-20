@@ -21,10 +21,22 @@ const loose = (value: string): string =>
 const cart = brand.data.cart;
 const product = cart.product;
 
-/** Adds a product from its PDP and returns the open cart drawer. */
+/**
+ * Adds a product from its PDP and reports the open drawer together with the
+ * price the page was advertising at the moment it went in.
+ *
+ * The cart is then held to what the storefront just asked for rather than to
+ * a figure written down here. The catalogue is repriced whenever a promotion
+ * starts or ends, and a number baked into the suite turns each of those into
+ * a wall of failures that say nothing about whether the cart works.
+ */
 async function addProduct(app: App, handle: string) {
   await app.product.open(handle);
-  return app.product.addToCart();
+  const price = await app.product.currentPrice();
+  const comparePrice = await app.product.compareAtPrice();
+  const drawer = await app.product.addToCart();
+
+  return { drawer, price, comparePrice };
 }
 
 test.describe(`${brand.name} cart @smoke`, () => {
@@ -33,10 +45,15 @@ test.describe(`${brand.name} cart @smoke`, () => {
   }) => {
     const app = createPages(page);
 
-    await test.step(`Add ${product.name} to the cart`, async () => {
-      const drawer = await addProduct(app, product.handle);
-      await drawer.close();
-    });
+    const { price } = await test.step(
+      `Add ${product.name} to the cart`,
+      async () => {
+        const added = await addProduct(app, product.handle);
+        await added.drawer.close();
+
+        return added;
+      },
+    );
 
     await test.step('Header badge shows 1', async () => {
       await expect(app.header.cartBadge).toHaveText('1');
@@ -66,7 +83,7 @@ test.describe(`${brand.name} cart @smoke`, () => {
       await expect(drawer.summaryTitle).toHaveText(/order summary/i);
       await expect(drawer.checkoutBar).toBeVisible();
       expect(await drawer.itemCountValue()).toBe(1);
-      expect(await drawer.totalAmount()).toBe(product.price);
+      expect(await drawer.totalAmount()).toBe(price);
       await expect(drawer.checkoutButton).toHaveText(/checkout/i);
     });
   });
@@ -133,7 +150,10 @@ test.describe(`${brand.name} cart @smoke`, () => {
     page,
   }) => {
     const app = createPages(page);
-    const drawer = await addProduct(app, product.handle);
+    const { drawer, price, comparePrice } = await addProduct(
+      app,
+      product.handle,
+    );
 
     await test.step('Every line element is present', async () => {
       await expect(drawer.lineImage(0)).toBeVisible();
@@ -151,9 +171,9 @@ test.describe(`${brand.name} cart @smoke`, () => {
       await expect(drawer.lineVariant(0)).toHaveText(
         new RegExp(product.variant, 'i'),
       );
-      expect(await drawer.linePrice(0)).toBe(product.price);
+      expect(await drawer.linePrice(0)).toBe(price);
       expect(await drawer.priceOf(drawer.lineComparePrice(0))).toBe(
-        product.comparePrice,
+        comparePrice,
       );
       await expect(drawer.lineComparePrice(0)).toHaveCSS(
         'text-decoration-line',
@@ -167,7 +187,10 @@ test.describe(`${brand.name} cart @smoke`, () => {
     page,
   }) => {
     const app = createPages(page);
-    const drawer = await addProduct(app, product.handle);
+    const { drawer, price } = await addProduct(
+      app,
+      product.handle,
+    );
 
     await test.step('Tap the product name on the line item', async () => {
       await drawer.lineNameLink(0).click();
@@ -181,7 +204,7 @@ test.describe(`${brand.name} cart @smoke`, () => {
       expect(loose(await app.product.text(app.product.subtitle))).toContain(
         loose(product.variant),
       );
-      expect(await app.product.currentPrice()).toBe(product.price);
+      expect(await app.product.currentPrice()).toBe(price);
     });
   });
 
@@ -190,11 +213,15 @@ test.describe(`${brand.name} cart @smoke`, () => {
   }) => {
     const app = createPages(page);
     const second = cart.secondProduct;
+    let prices = { first: 0, second: 0 };
 
     await test.step('Add two distinct products', async () => {
       const first = await addProduct(app, product.handle);
-      await first.close();
-      await addProduct(app, second.handle);
+      await first.drawer.close();
+      prices = {
+        first: first.price,
+        second: (await addProduct(app, second.handle)).price,
+      };
     });
 
     const drawer = app.cartDrawer;
@@ -214,10 +241,12 @@ test.describe(`${brand.name} cart @smoke`, () => {
     await test.step('Only the other product remains and totals drop by its price', async () => {
       expect(await drawer.lineCount()).toBe(1);
       expect(await drawer.lineName(0)).toMatch(new RegExp(second.name, 'i'));
-      await expect(drawer.summaryTotalAmount).toHaveText(
-        new RegExp(String(second.price)),
-      );
-      expect(await drawer.estimatedTotal()).toBe(totalBefore - product.price);
+      // Compare the parsed amount rather than matching digits against the
+      // rendered text: the storefront groups thousands, so the digits 1299
+      // never appear in "₹1,299" and the match fails on any four-figure
+      // price however correct the total is.
+      expect(await drawer.estimatedTotal()).toBe(prices.second);
+      expect(await drawer.estimatedTotal()).toBe(totalBefore - prices.first);
     });
 
     await test.step('Header badge decreases accordingly', async () => {
@@ -229,10 +258,13 @@ test.describe(`${brand.name} cart @smoke`, () => {
     page,
   }) => {
     const app = createPages(page);
-    const drawer = await addProduct(app, product.handle);
+    const { drawer, price } = await addProduct(
+      app,
+      product.handle,
+    );
     await drawer.expandSummary();
 
-    expect(await drawer.subtotal()).toBe(product.price);
+    expect(await drawer.subtotal()).toBe(price);
 
     await test.step('Tap the plus control', async () => {
       await drawer.increaseQuantity(0);
@@ -240,8 +272,8 @@ test.describe(`${brand.name} cart @smoke`, () => {
 
     await test.step('Stepper reads 2 and the totals double', async () => {
       expect(await drawer.quantity(0)).toBe(2);
-      expect(await drawer.subtotal()).toBe(product.price * 2);
-      expect(await drawer.estimatedTotal()).toBe(product.price * 2);
+      expect(await drawer.subtotal()).toBe(price * 2);
+      expect(await drawer.estimatedTotal()).toBe(price * 2);
       expect(await drawer.itemCountValue()).toBe(2);
       await expect(drawer.itemCount).toHaveText(/2\s*items/i);
     });
@@ -251,13 +283,16 @@ test.describe(`${brand.name} cart @smoke`, () => {
     page,
   }) => {
     const app = createPages(page);
-    const drawer = await addProduct(app, product.handle);
+    const { drawer, price } = await addProduct(
+      app,
+      product.handle,
+    );
     await drawer.expandSummary();
 
     await test.step('Raise the quantity to 3', async () => {
       await drawer.increaseQuantity(0, 2);
       expect(await drawer.quantity(0)).toBe(3);
-      expect(await drawer.subtotal()).toBe(product.price * 3);
+      expect(await drawer.subtotal()).toBe(price * 3);
     });
 
     await test.step('Tap the minus control once', async () => {
@@ -266,8 +301,8 @@ test.describe(`${brand.name} cart @smoke`, () => {
 
     await test.step('Stepper reads 2 and the subtotal matches', async () => {
       expect(await drawer.quantity(0)).toBe(2);
-      expect(await drawer.subtotal()).toBe(product.price * 2);
-      expect(await drawer.estimatedTotal()).toBe(product.price * 2);
+      expect(await drawer.subtotal()).toBe(price * 2);
+      expect(await drawer.estimatedTotal()).toBe(price * 2);
     });
   });
 
@@ -275,7 +310,10 @@ test.describe(`${brand.name} cart @smoke`, () => {
     page,
   }) => {
     const app = createPages(page);
-    const drawer = await addProduct(app, product.handle);
+    const { drawer } = await addProduct(
+      app,
+      product.handle,
+    );
     await drawer.expandSummary();
 
     const totalBefore = await drawer.estimatedTotal();
@@ -306,7 +344,10 @@ test.describe(`${brand.name} cart @smoke`, () => {
     page,
   }) => {
     const app = createPages(page);
-    const drawer = await addProduct(app, product.handle);
+    const { drawer, price } = await addProduct(
+      app,
+      product.handle,
+    );
 
     await test.step('Summary starts collapsed', async () => {
       expect(await drawer.isSummaryOpen()).toBe(false);
@@ -323,7 +364,7 @@ test.describe(`${brand.name} cart @smoke`, () => {
       expect((await drawer.summaryRowLabels()).map(loose)).toEqual(
         cart.summaryRows.map(loose),
       );
-      expect(await drawer.subtotal()).toBe(product.price);
+      expect(await drawer.subtotal()).toBe(price);
       await expect(
         drawer.summaryRows.filter({ hasText: 'Taxes' }),
       ).toContainText(/included/i);
@@ -333,7 +374,7 @@ test.describe(`${brand.name} cart @smoke`, () => {
 
     await test.step('Estimated total matches the cart', async () => {
       await expect(drawer.summaryTotal).toContainText(/est\.?\s*total/i);
-      expect(await drawer.estimatedTotal()).toBe(product.price);
+      expect(await drawer.estimatedTotal()).toBe(price);
     });
   });
 
@@ -341,7 +382,10 @@ test.describe(`${brand.name} cart @smoke`, () => {
     page,
   }) => {
     const app = createPages(page);
-    const drawer = await addProduct(app, product.handle);
+    const { drawer, price } = await addProduct(
+      app,
+      product.handle,
+    );
 
     const barAmount = await drawer.totalAmount();
     const barItems = await drawer.itemCountValue();
@@ -366,7 +410,7 @@ test.describe(`${brand.name} cart @smoke`, () => {
     await test.step('Order summary reconciles with the cart', async () => {
       expect(await checkout.itemCount()).toBe(barItems);
       expect(await checkout.payableAmount()).toBe(barAmount);
-      expect(await checkout.payableAmount()).toBe(product.price);
+      expect(await checkout.payableAmount()).toBe(price);
     });
   });
 });
